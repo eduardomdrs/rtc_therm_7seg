@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 #define _MUX_PERIOD   5000
-#define _BLINK_PERIOD   20 
+#define _BLINK_PERIOD   10 
 #define _NO_DIGITS       4
 
 #define _BLINK_DIGIT     2
@@ -19,7 +19,7 @@ class SevenSegController
     
     // write a single digit
     void writeDigit(byte digit, byte value);
-    
+
     // control functions - single digits
     void disableDigit(byte digit);
     void enableDigit(byte digit);
@@ -41,6 +41,7 @@ class SevenSegController
     // high-level display modes
     void enableClockDisplay();
     void enableTempDisplay();
+    void enableNumericDisplay();
     
     // function used to expose member interrupt function
     static inline void handle_interrupt();

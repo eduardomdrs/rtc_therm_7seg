@@ -45,9 +45,9 @@ SevenSegController::SevenSegController(int muxPin0, int muxPin1, int muxPin2, in
 
 void SevenSegController::writeDigit(byte digit, byte value)
 {
-  noInterrupts();
+  //noInterrupts();
   _digitValues[digit] = value;
-  interrupts();
+  //interrupts();
 }
 
 void SevenSegController::disableDigit(byte digit)
@@ -59,9 +59,9 @@ void SevenSegController::disableDigit(byte digit)
 
 void SevenSegController::enableDigit(byte digit)
 {
-  noInterrupts();
+  //noInterrupts();
   _digitStatus[digit] = _ENABLE_DIGIT;
-  interrupts();
+  //interrupts();
 }
 
 void SevenSegController::enableDecimalPoint(byte digit)
@@ -76,9 +76,9 @@ void SevenSegController::disableDecimalPoint(byte digit)
 
 void SevenSegController::enableBlink(byte digit)
 {
-  noInterrupts();
+  //noInterrupts();
   _digitStatus[digit] = _BLINK_DIGIT;
-  interrupts();
+  //interrupts();
 }
 
 void SevenSegController::disableBlink(byte digit)
@@ -170,6 +170,20 @@ void SevenSegController::enableTempDisplay()
   enableDecimalPoint(1);
 
   enableDegreeSign();
+}
+
+void SevenSegController::enableNumericDisplay()
+{
+  disableColon();
+  enableDigit(0);
+  enableDigit(1);
+  enableDigit(2);
+  enableDigit(3);
+  disableDecimalPoint(0);
+  disableDecimalPoint(1);
+  disableDecimalPoint(2);
+  disableDecimalPoint(3);
+  disableDegreeSign();
 }
 
 // ------------------------------ //
