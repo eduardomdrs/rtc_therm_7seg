@@ -7,20 +7,26 @@
 #include <OneButton.h>
 #include <Time.h>
 #include <MCP79412RTC.h>
+#include "pitches.h"
 #include "SevenSegController.h"
 
 // ---------------------- //
 //  display control pins
 // ---------------------- //
-#define DIGIT0_PIN 7
-#define DIGIT1_PIN 6
-#define DIGIT2_PIN 5
-#define DIGIT3_PIN 4
-#define COLON_PIN  3
-#define DEGREE_PIN 2
+#define DIGIT0_PIN 3
+#define DIGIT1_PIN 9
+#define DIGIT2_PIN 10
+#define DIGIT3_PIN 11
+#define COLON_PIN  5
+#define DEGREE_PIN 6
 #define LATCH_PIN  8
-#define CLOCK_PIN 12
-#define DATA_PIN  11 
+#define CLOCK_PIN  2
+#define DATA_PIN   7
+
+// ---------------------- //
+//  Thermometer
+// ---------------------- //
+#define ONE_WIRE_BUS 4
 
 // ---------------------- //
 //  button pins
@@ -34,7 +40,7 @@
 #define EDIT_TIME_MODE 0
 #define SHOW_TIME_MODE 1
 #define SHOW_TEMP_MODE 2
-#define ERROR		   3
+#define ERROR_MODE     3
 
 #define SHOW_TIME_DURATION 6500
 #define SHOW_TEMP_DURATION 3500
@@ -45,17 +51,13 @@
 #define NO_OF_DIGITS 4
 
 // ---------------------- //
-//  Thermometer
-// ---------------------- //
-#define ONE_WIRE_BUS 10
-
-// ---------------------- //
 //  Globals
 // ---------------------- //
 byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
 byte digitValues[4] = {0,0,0,0};
+byte brightness     = 100;
 int  tempInCelsius  = 0;
 long updateInterval = 100;
 long lastTempRead   = 0;
@@ -64,8 +66,8 @@ long lastShowTimeStart = 0;
 long lastShowTempStart = 0;
 
 SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
-OneButton buttonA(BUTTON_A_PIN, false);
-OneButton buttonB(BUTTON_B_PIN, false);
+OneButton buttonA(BUTTON_A_PIN, true);
+OneButton buttonB(BUTTON_B_PIN, true);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
@@ -94,13 +96,19 @@ void setup()
 	buttonB.attachDoubleClick(doubleClickB);
 	buttonB.attachLongPressStart(longPressB);
 
-	// initialize rtc
-	// setTime(11, 25, 00, 29, 7, 2015);
-  	// RTC.set(now());
-	setSyncProvider(RTC.get);
-
 	// initialize serial
 	Serial.begin(9600);
+
+  // initialize rtc
+  setSyncProvider(RTC.get);
+  setSyncInterval(2);
+  if(timeStatus()!= timeSet) 
+     Serial.println("Unable to sync with the RTC");
+  else
+     Serial.println("RTC has set the system time"); 
+
+  // set Brightness for the display
+  display.setBrightness(brightness);    
 }
 
 void loop()
@@ -171,13 +179,47 @@ void loop()
 
 			break;
 
-		case ERROR:
+		case ERROR_MODE:
 		default:
 			break;
 	}
 
 	delay(10);
 }
+
+void playSong()
+{
+  int melody[] = {NOTE_A6, NOTE_A6,NOTE_B6, NOTE_G6, NOTE_A6,0, NOTE_B6, NOTE_C7, NOTE_B6, NOTE_G6, NOTE_A6, NOTE_B6, NOTE_C7, NOTE_B6, NOTE_A6, NOTE_G6, NOTE_A6};
+  int noteDurations[] = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2};
+
+  for (int thisNote = 0; thisNote < 16; thisNote++)
+  {
+    int noteDuration = 1000/noteDurations[thisNote];  
+    tone(A2, melody[thisNote],noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    delay(pauseBetweenNotes);
+    noTone(A2);
+  }
+}
+
+
+// ---------------------- //
+//  RTC test functions
+// ---------------------- //
+void rtcStatus()
+{
+  timeStatus_t rtcSta = timeStatus();
+  
+  if(rtcSta == timeSet)
+    Serial.println("Time's clock has been set.");
+  else if (rtcSta == timeNotSet)
+    Serial.println("Time's clock has not been set.");
+  else if (rtcSta == timeNeedsSync)
+    Serial.println("Time's clock is set, but the sync has failed.");
+  else
+    Serial.println("error");
+}
+
 
 // ---------------------- //
 //  Display Update fnc
@@ -197,8 +239,6 @@ void updateTime()
 	display.writeDigit(1, digitValues[1]);
 	display.writeDigit(2, digitValues[2]);
 	display.writeDigit(3, digitValues[3]);
-
-	digitalClockDisplay();
 }
 
 
@@ -265,6 +305,25 @@ int maxValueForDigit(int digit)
 // ---------------------- //
 //  Button callbacks
 // ---------------------- //
+void increaseBrightness()
+{
+  brightness+=15;
+  if (brightness >= 255)
+    brightness = 255;
+  display.setBrightness(brightness);
+  Serial.println(brightness);
+}
+
+void decreaseBrightness()
+{
+  brightness-=15;
+  if (brightness <= 0)
+    brightness = 0;
+  display.setBrightness(brightness);
+  Serial.println(brightness);
+}
+
+
 void doubleClickA()
 {
 	if (fsmState == EDIT_TIME_MODE)

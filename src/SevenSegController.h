@@ -11,7 +11,6 @@
 #define _ENABLE_DIGIT    1
 #define _DISABLE_DIGIT   0
 
-
 class SevenSegController
 {
   public:
@@ -31,7 +30,8 @@ class SevenSegController
     void disableDegreeSign();
     void enableBlink(byte digit);
     void disableBlink(byte digit);
-
+    void setBrightness(byte brightness);
+    
     // control functions - whole display
     void enableBlinkDisplay();
     void disableBlinkDisplay();
@@ -52,10 +52,11 @@ class SevenSegController
     static SevenSegController *active_object;
 
     volatile int _selectedDigit;
-    byte _digitValues[4]; // stores the values to display for each digit
-    byte _digitStatus[4]; // 0: disabled, 1: enabled, 2: blinking
-    byte _showDecimal[4]; // 1: show, 0: do not show
-    int _blinkCounter[4]; // used for timing blink pattern
+    byte _digitValues[_NO_DIGITS]; // stores the values to display for each digit
+    byte _digitStatus[_NO_DIGITS]; // 0: disabled, 1: enabled, 2: blinking
+    byte _showDecimal[_NO_DIGITS]; // 1: show, 0: do not show
+    int _blinkCounter[_NO_DIGITS]; // used for timing blink pattern
+    byte _brightness;  // define brightness from 0 to 255
     int _muxPins[4];
     int _colonPin;
     int _degreePin;

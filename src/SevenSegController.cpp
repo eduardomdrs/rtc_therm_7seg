@@ -17,16 +17,17 @@ SevenSegController::SevenSegController(int muxPin0, int muxPin1, int muxPin2, in
     for (int i = 0; i < _NO_DIGITS; ++i)
     {
       _digitStatus [i] = 0;
-      _digitStatus [0] = _ENABLE_DIGIT;
-      _blinkCounter[0] = 0;
-      _showDecimal [0] = 0;
+      _digitStatus [i] = _ENABLE_DIGIT;
+      _blinkCounter[i] = 0;
+      _showDecimal [i] = 0;
     }
 
-    _colonPin  = colonPin;
-    _degreePin = degreePin;
-    _latchPin  = latchPin;
-    _dataPin   = dataPin;
-    _clkPin    = clkPin;
+    _colonPin   = colonPin;
+    _degreePin  = degreePin;
+    _latchPin   = latchPin;
+    _dataPin    = dataPin;
+    _clkPin     = clkPin;
+    _brightness = 255;
     _selectedDigit = 0;
     
     pinMode(_muxPins[0], OUTPUT);
@@ -45,23 +46,17 @@ SevenSegController::SevenSegController(int muxPin0, int muxPin1, int muxPin2, in
 
 void SevenSegController::writeDigit(byte digit, byte value)
 {
-  //noInterrupts();
   _digitValues[digit] = value;
-  //interrupts();
 }
 
 void SevenSegController::disableDigit(byte digit)
 {
-  noInterrupts();
   _digitStatus[digit] = _DISABLE_DIGIT;
-  interrupts();
 }
 
 void SevenSegController::enableDigit(byte digit)
 {
-  //noInterrupts();
   _digitStatus[digit] = _ENABLE_DIGIT;
-  //interrupts();
 }
 
 void SevenSegController::enableDecimalPoint(byte digit)
@@ -76,9 +71,7 @@ void SevenSegController::disableDecimalPoint(byte digit)
 
 void SevenSegController::enableBlink(byte digit)
 {
-  //noInterrupts();
   _digitStatus[digit] = _BLINK_DIGIT;
-  //interrupts();
 }
 
 void SevenSegController::disableBlink(byte digit)
@@ -86,9 +79,15 @@ void SevenSegController::disableBlink(byte digit)
   enableDigit(digit);
 }
 
+void SevenSegController::setBrightness(byte brightness)
+{
+  _brightness = brightness;
+}
+
 void SevenSegController::enableDegreeSign()
 {
-  digitalWrite(_degreePin, HIGH);
+  //digitalWrite(_degreePin, HIGH);
+  analogWrite(_degreePin, _brightness);
 }
 
 void SevenSegController::disableDegreeSign()
@@ -98,7 +97,8 @@ void SevenSegController::disableDegreeSign()
 
 void SevenSegController::enableColon()
 {
-  digitalWrite(_colonPin, HIGH);
+  //digitalWrite(_colonPin, HIGH);
+  analogWrite(_colonPin, _brightness);
 }
 
 void SevenSegController::disableColon()
@@ -210,7 +210,7 @@ void SevenSegController::muxDisplay(void)
     if (_digitStatus[_selectedDigit] == 1)
     {
 
-      digitalWrite(_muxPins[_selectedDigit], HIGH);
+      analogWrite(_muxPins[_selectedDigit], _brightness);
 
     } else if (_digitStatus[_selectedDigit] == 2)
     {
@@ -218,7 +218,7 @@ void SevenSegController::muxDisplay(void)
       {
         if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
         {
-          digitalWrite(_muxPins[_selectedDigit], HIGH);
+          analogWrite(_muxPins[_selectedDigit], _brightness);
         }
         _blinkCounter[_selectedDigit]++;
 
@@ -230,9 +230,46 @@ void SevenSegController::muxDisplay(void)
     digitalWrite(_latchPin, HIGH);
 
     _selectedDigit++;
-    if (_selectedDigit == 4)
-      _selectedDigit = 0;
+    _selectedDigit %= _NO_DIGITS;
 }
+
+//void SevenSegController::muxDisplay(void)
+//{
+//    byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
+//    digitalWrite(_latchPin, LOW);
+//    shiftOut(_dataPin, _clkPin, LSBFIRST, value);
+//
+//    digitalWrite(_muxPins[0], LOW);
+//    digitalWrite(_muxPins[1], LOW);
+//    digitalWrite(_muxPins[2], LOW);
+//    digitalWrite(_muxPins[3], LOW);
+//
+//    if (_digitStatus[_selectedDigit] == 1)
+//    {
+//
+//      digitalWrite(_muxPins[_selectedDigit], HIGH);
+//
+//    } else if (_digitStatus[_selectedDigit] == 2)
+//    {
+//      if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
+//      {
+//        if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
+//        {
+//          digitalWrite(_muxPins[_selectedDigit], HIGH);
+//        }
+//        _blinkCounter[_selectedDigit]++;
+//
+//      } else {
+//        _blinkCounter[_selectedDigit] = 0;
+//      }
+//    }
+//
+//    digitalWrite(_latchPin, HIGH);
+//
+//    _selectedDigit++;
+//    if (_selectedDigit == 4)
+//      _selectedDigit = 0;
+//}
 
 
 byte SevenSegController::translateDigit(byte digit)
