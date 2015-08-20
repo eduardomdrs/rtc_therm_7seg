@@ -7,7 +7,6 @@
 #include <OneButton.h>
 #include <Time.h>
 #include <MCP79412RTC.h>
-#include "pitches.h"
 #include "SevenSegController.h"
 
 // ---------------------- //
@@ -186,22 +185,6 @@ void loop()
 
 	delay(10);
 }
-
-void playSong()
-{
-  int melody[] = {NOTE_A6, NOTE_A6,NOTE_B6, NOTE_G6, NOTE_A6,0, NOTE_B6, NOTE_C7, NOTE_B6, NOTE_G6, NOTE_A6, NOTE_B6, NOTE_C7, NOTE_B6, NOTE_A6, NOTE_G6, NOTE_A6};
-  int noteDurations[] = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2};
-
-  for (int thisNote = 0; thisNote < 16; thisNote++)
-  {
-    int noteDuration = 1000/noteDurations[thisNote];  
-    tone(A2, melody[thisNote],noteDuration);
-    int pauseBetweenNotes = noteDuration * 1.30;
-    delay(pauseBetweenNotes);
-    noTone(A2);
-  }
-}
-
 
 // ---------------------- //
 //  RTC test functions
