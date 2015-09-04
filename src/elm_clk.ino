@@ -71,121 +71,6 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
 
-void setup()
-{
-	fsmState = EDIT_TIME_MODE;
-
-	// initialize thermometer
-	sensor.begin();
-	sensor.setWaitForConversion(true);
-	sensor.getAddress(devAddr, 0);
-	sensor.requestTemperatures();
-	tempInCelsius = (int) (sensor.getTempC(devAddr)*10);
-
-	// initialize buttons
-	buttonA.setClickTicks(250);
-	buttonA.setPressTicks(600);
-	buttonA.attachLongPressStart(longPressA);
-	buttonA.attachClick(singleClickA);
-	buttonA.attachDoubleClick(doubleClickA);
-
-	buttonB.setClickTicks(250);
-	buttonB.setPressTicks(600);
-	buttonB.attachClick(singleClickB);
-	buttonB.attachDoubleClick(doubleClickB);
-	buttonB.attachLongPressStart(longPressB);
-
-	// initialize serial
-	Serial.begin(9600);
-
-  // initialize rtc
-  setSyncProvider(RTC.get);
-  setSyncInterval(2);
-  if(timeStatus()!= timeSet) 
-     Serial.println("Unable to sync with the RTC");
-  else
-     Serial.println("RTC has set the system time"); 
-
-  // set Brightness for the display
-  display.setBrightness(brightness);    
-}
-
-void loop()
-{
-	buttonA.tick();
-	buttonB.tick();
-
-	switch (fsmState)
-	{
-		case EDIT_TIME_MODE:
-
-			if (oldFsmState != fsmState)
-			{
-				display.enableClockDisplay();
-				display.enableBlink(0);
-			}
-
-			oldFsmState = fsmState;
-			break;
-
-		case SHOW_TIME_MODE:
-
-			if (oldFsmState != fsmState)
-			{
-				updateTime();
-				lastClockRead = millis();
-				lastShowTimeStart = lastClockRead;
-				display.enableClockDisplay();
-			}
-
-			oldFsmState = fsmState;
-
-			if ((millis() - lastClockRead) > 100)
-			{
-				updateTime();
-				lastClockRead = millis();
-			}
-
-			if ((millis() - lastShowTimeStart) > SHOW_TIME_DURATION)
-			{
-				fsmState = SHOW_TEMP_MODE;
-			}
-
-			break;
-
-		case SHOW_TEMP_MODE:
-			
-			if (oldFsmState != fsmState)
-			{
-				updateTemperature();
-				lastTempRead = millis();
-				lastShowTempStart = lastTempRead;
-				display.enableTempDisplay();
-			}
-
-			oldFsmState = fsmState;
-
-			if ((millis() - lastTempRead) > 100)
-			{
-				updateTemperature();
-				lastTempRead = millis();
-			}
-
-			if ((millis() - lastShowTempStart) > SHOW_TEMP_DURATION)
-			{
-				fsmState = SHOW_TIME_MODE;
-			}
-
-			break;
-
-		case ERROR_MODE:
-		default:
-			break;
-	}
-
-	delay(10);
-}
-
 // ---------------------- //
 //  RTC test functions
 // ---------------------- //
@@ -237,6 +122,15 @@ void updateTemperature()
 	display.writeDigit(2,digitValues[2]);
 }
 
+void printDigits(int digits)
+{
+  // utility function for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if(digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
 void digitalClockDisplay()
 {
 	time_t t = now();
@@ -250,15 +144,6 @@ void digitalClockDisplay()
 	Serial.print(" ");
 	Serial.print(year(t)); 
 	Serial.println(); 
-}
-
-void printDigits(int digits)
-{
-  // utility function for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
 }
 
 int maxValueForDigit(int digit)
@@ -380,4 +265,119 @@ void longPressB()
 		display.writeDigit(2, 0);
 		display.writeDigit(3, 0);
 	}
+}
+
+void setup()
+{
+	fsmState = EDIT_TIME_MODE;
+
+	// initialize thermometer
+	sensor.begin();
+	sensor.setWaitForConversion(true);
+	sensor.getAddress(devAddr, 0);
+	sensor.requestTemperatures();
+	tempInCelsius = (int) (sensor.getTempC(devAddr)*10);
+
+	// initialize buttons
+	buttonA.setClickTicks(250);
+	buttonA.setPressTicks(600);
+	buttonA.attachLongPressStart(longPressA);
+	buttonA.attachClick(singleClickA);
+	buttonA.attachDoubleClick(doubleClickA);
+
+	buttonB.setClickTicks(250);
+	buttonB.setPressTicks(600);
+	buttonB.attachClick(singleClickB);
+	buttonB.attachDoubleClick(doubleClickB);
+	buttonB.attachLongPressStart(longPressB);
+
+	// initialize serial
+	Serial.begin(9600);
+
+  // initialize rtc
+  setSyncProvider(RTC.get);
+  setSyncInterval(2);
+  if(timeStatus()!= timeSet) 
+     Serial.println("Unable to sync with the RTC");
+  else
+     Serial.println("RTC has set the system time"); 
+
+  // set Brightness for the display
+  display.setBrightness(brightness);    
+}
+
+void loop()
+{
+	buttonA.tick();
+	buttonB.tick();
+
+	switch (fsmState)
+	{
+		case EDIT_TIME_MODE:
+
+			if (oldFsmState != fsmState)
+			{
+				display.enableClockDisplay();
+				display.enableBlink(0);
+			}
+
+			oldFsmState = fsmState;
+			break;
+
+		case SHOW_TIME_MODE:
+
+			if (oldFsmState != fsmState)
+			{
+				updateTime();
+				lastClockRead = millis();
+				lastShowTimeStart = lastClockRead;
+				display.enableClockDisplay();
+			}
+
+			oldFsmState = fsmState;
+
+			if ((millis() - lastClockRead) > 100)
+			{
+				updateTime();
+				lastClockRead = millis();
+			}
+
+			if ((millis() - lastShowTimeStart) > SHOW_TIME_DURATION)
+			{
+				fsmState = SHOW_TEMP_MODE;
+			}
+
+			break;
+
+		case SHOW_TEMP_MODE:
+			
+			if (oldFsmState != fsmState)
+			{
+				updateTemperature();
+				lastTempRead = millis();
+				lastShowTempStart = lastTempRead;
+				display.enableTempDisplay();
+			}
+
+			oldFsmState = fsmState;
+
+			if ((millis() - lastTempRead) > 100)
+			{
+				updateTemperature();
+				lastTempRead = millis();
+			}
+
+			if ((millis() - lastShowTempStart) > SHOW_TEMP_DURATION)
+			{
+				fsmState = SHOW_TIME_MODE;
+			}
+
+			break;
+
+		case ERROR_MODE:
+		default:
+			break;
+	}
+
+	delay(10);
 }
