@@ -19,6 +19,7 @@ class SevenSegController
     // write a single digit
     void writeDigit(byte digit, char value);
     void writeDigit(byte digit, byte value);
+    void writeMessage(const char* msg);
 
     // control functions - single digits
     void disableDigit(byte digit);

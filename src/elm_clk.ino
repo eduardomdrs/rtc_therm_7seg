@@ -37,13 +37,15 @@
 // ---------------------- //
 //  FSM definitions
 // ---------------------- //
-#define EDIT_TIME_MODE 0
-#define SHOW_TIME_MODE 1
-#define SHOW_TEMP_MODE 2
-#define ERROR_MODE     3
+#define EDIT_TIME_MODE  0
+#define EDIT_ALARM_MODE 1
+#define SHOW_TIME_MODE  2
+#define SHOW_TEMP_MODE  3
+#define ERROR_MODE      4
 
-#define SHOW_TIME_DURATION 6500
-#define SHOW_TEMP_DURATION 3500
+
+#define SHOW_TIME_DURATION 7000
+#define SHOW_TEMP_DURATION 3000
 
 // ---------------------- //
 //  RTC definitions
@@ -57,13 +59,13 @@ byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
 byte digitValues[4] = {0,0,0,0};
-byte brightness     = 100;
+byte alarmOn		= 0; // default state is OFF
 int  tempInCelsius  = 0;
-long updateInterval = 100;
-long lastTempRead   = 0;
-long lastClockRead  = 0;
-long lastShowTimeStart = 0;
-long lastShowTempStart = 0;
+unsigned long updateInterval    = 100;
+unsigned long lastTempRead      = 0;
+unsigned long lastClockRead     = 0;
+unsigned long lastShowTimeStart = 0;
+unsigned long lastShowTempStart = 0;
 
 SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
 OneButton buttonA(BUTTON_A_PIN, true);
@@ -110,6 +112,21 @@ void updateTime()
 	display.writeDigit(3, digitValues[3]);
 }
 
+void updateAlarm()
+{
+	int h = 15;
+	int m = 37;
+
+	digitValues[0] = h / 10;
+	digitValues[1] = h % 10;
+	digitValues[2] = m / 10;
+	digitValues[3] = m % 10;
+
+	display.writeDigit(0, digitValues[0]);
+	display.writeDigit(1, digitValues[1]);
+	display.writeDigit(2, digitValues[2]);
+	display.writeDigit(3, digitValues[3]);
+}
 
 void updateTemperature()
 {
@@ -213,28 +230,9 @@ void playSong()
 	display.enableDisplay();
 }
 
-void increaseBrightness()
-{
-  brightness+=15;
-  if (brightness >= 255)
-    brightness = 255;
-  display.setBrightness(brightness);
-  Serial.println(brightness);
-}
-
-void decreaseBrightness()
-{
-  brightness-=15;
-  if (brightness <= 0)
-    brightness = 0;
-  display.setBrightness(brightness);
-  Serial.println(brightness);
-}
-
-
 void doubleClickA()
 {
-	if (fsmState == EDIT_TIME_MODE)
+	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
 	{
 		display.disableBlink(activeDigit);
 		activeDigit+=2;
@@ -245,7 +243,7 @@ void doubleClickA()
 
 void singleClickA()
 {
-	if (fsmState == EDIT_TIME_MODE)
+	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
 	{
 		display.disableBlink(activeDigit);
 		activeDigit++;
@@ -268,6 +266,28 @@ void longPressA()
   			fsmState = SHOW_TIME_MODE;
   			break;
 
+		case EDIT_ALARM_MODE:
+			if (alarmOn)
+			{
+				alarmOn = 0;
+				display.enableNumericDisplay();
+				display.writeMessage("OFF ");
+				delay(600);
+				updateAlarm();
+				display.enableClockDisplay();
+				display.enableBlink(0);
+			} else 
+			{
+				alarmOn = 1;
+				display.enableNumericDisplay();
+				display.writeMessage("ON  ");
+				delay(600);
+				updateAlarm();
+				display.enableClockDisplay();
+				display.enableBlink(0);
+			}
+			break;
+
 		case SHOW_TIME_MODE:
 			fsmState = EDIT_TIME_MODE;
 			break;
@@ -276,7 +296,7 @@ void longPressA()
 
 void doubleClickB()
 {
-	if (fsmState == EDIT_TIME_MODE)
+	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
 	{
 		digitValues[activeDigit] += 2;
 		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
@@ -286,7 +306,7 @@ void doubleClickB()
 
 void singleClickB()
 {
-	if (fsmState == EDIT_TIME_MODE)
+	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
 	{
 		digitValues[activeDigit]++;
 		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
@@ -299,14 +319,27 @@ void singleClickB()
 
 void longPressB()
 {
-	if (fsmState == EDIT_TIME_MODE)
+	switch(fsmState)
 	{
-		digitValues[0] = 0; digitValues[1] = 0;
-		digitValues[2] = 0; digitValues[3] = 0;
-		display.writeDigit(0, 0);
-		display.writeDigit(1, 0);
-		display.writeDigit(2, 0);
-		display.writeDigit(3, 0);
+		case EDIT_ALARM_MODE:
+			int h;
+			int m;
+			h = digitValues[0]*10 + digitValues[1];
+			m = digitValues[2]*10 + digitValues[3];
+			//setTime(h, m, 0, 1, 1, 2015);
+  			//RTC.set(now());
+
+			Serial.print("New alarm time: ");
+			Serial.print(h);
+			Serial.print(":");
+			Serial.println(m);
+
+  			fsmState = SHOW_TIME_MODE;
+  			break;
+
+		case SHOW_TIME_MODE:
+			fsmState = EDIT_ALARM_MODE;
+			break;
 	}
 }
 
@@ -344,9 +377,6 @@ void setup()
 		Serial.println("Unable to sync with the RTC");
 	else
 		Serial.println("RTC has set the system time"); 
-
-	// set Brightness for the display
-	display.setBrightness(brightness);    
 }
 
 void loop()
@@ -360,6 +390,25 @@ void loop()
 
 			if (oldFsmState != fsmState)
 			{
+				display.enableNumericDisplay();
+				display.writeMessage("hora");
+				delay(600);
+				updateTime();
+				display.enableClockDisplay();
+				display.enableBlink(0);
+			}
+
+			oldFsmState = fsmState;
+			break;
+
+		case EDIT_ALARM_MODE:
+			
+			if (oldFsmState != fsmState)
+			{
+				display.enableNumericDisplay();
+				display.writeMessage("alarme");
+				delay(600);
+				updateAlarm();
 				display.enableClockDisplay();
 				display.enableBlink(0);
 			}
@@ -379,7 +428,7 @@ void loop()
 
 			oldFsmState = fsmState;
 
-			if ((millis() - lastClockRead) > 100)
+			if ((millis() - lastClockRead) > updateInterval)
 			{
 				updateTime();
 				lastClockRead = millis();
@@ -404,7 +453,7 @@ void loop()
 
 			oldFsmState = fsmState;
 
-			if ((millis() - lastTempRead) > 100)
+			if ((millis() - lastTempRead) > updateInterval)
 			{
 				updateTemperature();
 				lastTempRead = millis();

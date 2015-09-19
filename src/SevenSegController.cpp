@@ -54,6 +54,12 @@ void SevenSegController::writeDigit(byte digit, byte value)
   _digitValues[digit] = (char) value;
 }
 
+void SevenSegController::writeMessage(const char* msg)
+{
+  for (int i = 0; i < 4; i++)
+    writeDigit(i, msg[i]);
+}
+
 void SevenSegController::disableDigit(byte digit)
 {
   _digitStatus[digit] = _DISABLE_DIGIT;
