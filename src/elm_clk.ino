@@ -57,7 +57,7 @@
 // ---------------------- //
 //  RTC definitions
 // ---------------------- //
-#define NO_OF_DIGITS 4
+#define N 4
 
 // ---------------------- //
 //  Globals
@@ -65,7 +65,7 @@
 byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
-byte digitValues[4] = {0,0,0,0};
+byte digitValues[N] = {0,0,0,0};
 byte alarmOn		= 0; // default state is OFF
 int  tempInCelsius  = 0;
 unsigned long updateInterval    = 100;
@@ -243,7 +243,7 @@ void doubleClickA()
 	{
 		display.disableBlink(activeDigit);
 		activeDigit+=2;
-		activeDigit %= NO_OF_DIGITS;
+		activeDigit %= N;
 		display.enableBlink(activeDigit);
 	}	
 }
@@ -254,7 +254,7 @@ void singleClickA()
 	{
 		display.disableBlink(activeDigit);
 		activeDigit++;
-		activeDigit %= NO_OF_DIGITS;
+		activeDigit %= N;
 		display.enableBlink(activeDigit);
 	}
 }
@@ -277,21 +277,13 @@ void longPressA()
 			if (alarmOn)
 			{
 				alarmOn = 0;
-				display.enableNumericDisplay();
-				display.writeMessage("OFF ");
-				delay(600);
-				updateAlarm();
-				display.enableClockDisplay();
-				display.enableBlink(0);
+				for (int i = 0; i < N; i++)
+					display.disableDecimalPoint(i);
 			} else 
 			{
 				alarmOn = 1;
-				display.enableNumericDisplay();
-				display.writeMessage("ON  ");
-				delay(600);
-				updateAlarm();
-				display.enableClockDisplay();
-				display.enableBlink(0);
+				for (int i = 0; i < N; i++)
+					display.enableDecimalPoint(i);
 			}
 			break;
 
@@ -410,7 +402,8 @@ void loop()
 				delay(600);
 				updateTime();
 				display.enableClockDisplay();
-				display.enableBlink(0);
+				activeDigit = 0;
+				display.enableBlink(activeDigit);
 			}
 
 			oldFsmState = fsmState;
@@ -425,7 +418,18 @@ void loop()
 				delay(600);
 				updateAlarm();
 				display.enableClockDisplay();
-				display.enableBlink(0);
+
+				if (alarmOn)
+				{
+					for (int i = 0; i < N; i++)
+						display.enableDecimalPoint(i);
+				} else {
+					for (int i = 0; i < N; i++)
+						display.disableDecimalPoint(i);
+				}
+
+				activeDigit = 0;
+				display.enableBlink(activeDigit);
 			}
 
 			oldFsmState = fsmState;
