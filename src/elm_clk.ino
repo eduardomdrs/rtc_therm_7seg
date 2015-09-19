@@ -35,6 +35,13 @@
 #define BUTTON_B_PIN A1
 
 // ---------------------- //
+//  alarm pins / addr
+// ---------------------- //
+#define ALARM_PIN A3
+#define ALARM_H_ADDR 0x20
+#define ALARM_M_ADDR 0x21
+
+// ---------------------- //
 //  FSM definitions
 // ---------------------- //
 #define EDIT_TIME_MODE  0
@@ -114,8 +121,8 @@ void updateTime()
 
 void updateAlarm()
 {
-	int h = 15;
-	int m = 37;
+	int h = RTC.sramRead(ALARM_H_ADDR);
+	int m = RTC.sramRead(ALARM_M_ADDR);
 
 	digitValues[0] = h / 10;
 	digitValues[1] = h % 10;
@@ -326,12 +333,16 @@ void longPressB()
 			int m;
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
+			RTC.sramWrite(0x20, h);
+			RTC.sramWrite(0x21, m);
 			//setTime(h, m, 0, 1, 1, 2015);
   			//RTC.set(now());
 
 			Serial.print("New alarm time: ");
+			h = RTC.sramRead(0x20);
 			Serial.print(h);
 			Serial.print(":");
+			m = RTC.sramRead(0x21);
 			Serial.println(m);
 
   			fsmState = SHOW_TIME_MODE;
@@ -377,6 +388,10 @@ void setup()
 		Serial.println("Unable to sync with the RTC");
 	else
 		Serial.println("RTC has set the system time"); 
+	
+	pinMode(ALARM_PIN, INPUT_PULLUP);
+	RTC.sramWrite(ALARM_H_ADDR,  8);
+	RTC.sramWrite(ALARM_M_ADDR, 30);
 }
 
 void loop()
