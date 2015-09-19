@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define _MUX_PERIOD   5000
+#define _MUX_PERIOD  20000
 #define _BLINK_PERIOD   10 
 #define _NO_DIGITS       4
 

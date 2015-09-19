@@ -108,11 +108,8 @@ void SevenSegController::disableColon()
 
 void SevenSegController::enableBlinkDisplay()
 {
-  noInterrupts();
-  int i = 0;
   for (int i = 0; i < _NO_DIGITS; ++i)
-    _digitStatus[_BLINK_DIGIT];
-  interrupts();
+    _digitStatus[i] = _BLINK_DIGIT;
 }
 
 void SevenSegController::disableBlinkDisplay()
@@ -122,20 +119,20 @@ void SevenSegController::disableBlinkDisplay()
 
 void SevenSegController::enableDisplay()
 {
-  noInterrupts();
-  int i = 0;
   for (int i = 0; i < _NO_DIGITS; ++i)
-    _digitStatus[_ENABLE_DIGIT];
-  interrupts();
+    _digitStatus[i] = _ENABLE_DIGIT;
+
+  muxDisplay();
+  Timer1.attachInterrupt(handle_interrupt);
 }
 
 void SevenSegController::disableDisplay()
 {
-  noInterrupts();
-  int i = 0;
   for (int i = 0; i < _NO_DIGITS; ++i)
-    _digitStatus[_DISABLE_DIGIT];
-  interrupts(); 
+    _digitStatus[i] = _DISABLE_DIGIT;
+  
+  muxDisplay();
+  Timer1.detachInterrupt();
 }
 
 void SevenSegController::enableClockDisplay()
@@ -196,80 +193,80 @@ void SevenSegController::handle_interrupt()
   active_object->muxDisplay();
 }
 
+// void SevenSegController::muxDisplay(void)
+// {
+//     byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
+//     digitalWrite(_latchPin, LOW);
+//     shiftOut(_dataPin, _clkPin, LSBFIRST, value);
+
+//     digitalWrite(_muxPins[0], LOW);
+//     digitalWrite(_muxPins[1], LOW);
+//     digitalWrite(_muxPins[2], LOW);
+//     digitalWrite(_muxPins[3], LOW);
+
+//     if (_digitStatus[_selectedDigit] == 1)
+//     {
+
+//       analogWrite(_muxPins[_selectedDigit], _brightness);
+
+//     } else if (_digitStatus[_selectedDigit] == 2)
+//     {
+//       if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
+//       {
+//         if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
+//         {
+//           analogWrite(_muxPins[_selectedDigit], _brightness);
+//         }
+//         _blinkCounter[_selectedDigit]++;
+
+//       } else {
+//         _blinkCounter[_selectedDigit] = 0;
+//       }
+//     }
+
+//     digitalWrite(_latchPin, HIGH);
+
+//     _selectedDigit++;
+//     _selectedDigit %= _NO_DIGITS;
+// }
+
 void SevenSegController::muxDisplay(void)
 {
-    byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
-    digitalWrite(_latchPin, LOW);
-    shiftOut(_dataPin, _clkPin, LSBFIRST, value);
+   byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
+   digitalWrite(_latchPin, LOW);
+   shiftOut(_dataPin, _clkPin, LSBFIRST, value);
 
-    digitalWrite(_muxPins[0], LOW);
-    digitalWrite(_muxPins[1], LOW);
-    digitalWrite(_muxPins[2], LOW);
-    digitalWrite(_muxPins[3], LOW);
+   digitalWrite(_muxPins[0], LOW);
+   digitalWrite(_muxPins[1], LOW);
+   digitalWrite(_muxPins[2], LOW);
+   digitalWrite(_muxPins[3], LOW);
 
-    if (_digitStatus[_selectedDigit] == 1)
-    {
+   if (_digitStatus[_selectedDigit] == 1)
+   {
 
-      analogWrite(_muxPins[_selectedDigit], _brightness);
+     digitalWrite(_muxPins[_selectedDigit], HIGH);
 
-    } else if (_digitStatus[_selectedDigit] == 2)
-    {
-      if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
-      {
-        if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
-        {
-          analogWrite(_muxPins[_selectedDigit], _brightness);
-        }
-        _blinkCounter[_selectedDigit]++;
+   } else if (_digitStatus[_selectedDigit] == 2)
+   {
+     if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
+     {
+       if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
+       {
+         digitalWrite(_muxPins[_selectedDigit], HIGH);
+       }
+       _blinkCounter[_selectedDigit]++;
 
-      } else {
-        _blinkCounter[_selectedDigit] = 0;
-      }
-    }
+     } else {
+       _blinkCounter[_selectedDigit] = 0;
+     }
+   }
 
-    digitalWrite(_latchPin, HIGH);
+   digitalWrite(_latchPin, HIGH);
 
-    _selectedDigit++;
-    _selectedDigit %= _NO_DIGITS;
+   _selectedDigit++;
+   if (_selectedDigit == 4)
+     _selectedDigit = 0;
 }
-
-//void SevenSegController::muxDisplay(void)
-//{
-//    byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
-//    digitalWrite(_latchPin, LOW);
-//    shiftOut(_dataPin, _clkPin, LSBFIRST, value);
-//
-//    digitalWrite(_muxPins[0], LOW);
-//    digitalWrite(_muxPins[1], LOW);
-//    digitalWrite(_muxPins[2], LOW);
-//    digitalWrite(_muxPins[3], LOW);
-//
-//    if (_digitStatus[_selectedDigit] == 1)
-//    {
-//
-//      digitalWrite(_muxPins[_selectedDigit], HIGH);
-//
-//    } else if (_digitStatus[_selectedDigit] == 2)
-//    {
-//      if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
-//      {
-//        if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
-//        {
-//          digitalWrite(_muxPins[_selectedDigit], HIGH);
-//        }
-//        _blinkCounter[_selectedDigit]++;
-//
-//      } else {
-//        _blinkCounter[_selectedDigit] = 0;
-//      }
-//    }
-//
-//    digitalWrite(_latchPin, HIGH);
-//
-//    _selectedDigit++;
-//    if (_selectedDigit == 4)
-//      _selectedDigit = 0;
-//}
 
 
 byte SevenSegController::translateDigit(byte digit)

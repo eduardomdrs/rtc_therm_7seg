@@ -1,13 +1,14 @@
 #include <Wire.h>
-
 #include <OneWire.h>
 #include <TimerOne.h>
 #include <DallasTemperature.h>
-
 #include <OneButton.h>
 #include <Time.h>
 #include <MCP79412RTC.h>
+#include <avr/pgmspace.h>
+
 #include "SevenSegController.h"
+#include "pitches.h"
 
 // ---------------------- //
 //  display control pins
@@ -148,31 +149,70 @@ void digitalClockDisplay()
 
 int maxValueForDigit(int digit)
 {
+	int maxDigit = 0;
 	switch (digit)
 	{
 		case 0:
 			if (digitValues[1] >= 4)
-				return 2;
-			else
-				return 3;
+			{
+				maxDigit = 2;
+			} else
+			{
+				maxDigit = 3;
+			}
+			
+			break;
 
 		case 1:
 			if (digitValues[0] <= 1)
-				return 10;
-			else
-				return 4;
+			{
+				maxDigit = 10;
+			} else
+			{
+				maxDigit = 4;
+			}
+			break;
 
 		case 2:
-			return 6;
+			maxDigit = 6;
+			break;
 
 		case 3:
-			return 10;
+			maxDigit = 10;
+			break;
 	}
+
+	return maxDigit;
 }
 
 // ---------------------- //
 //  Button callbacks
 // ---------------------- //
+void playSong()
+{
+	display.disableDisplay();
+	int melody[] = {1319, 0, 1319, 0, 1319, 0, 1319, 0, 1976, 0, 1976, 0, 1976, 0, 1976, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1976, 0, 1976, 0, 1976, 0, 1976, 0, 2349, 0, 2349, 0, 2349, 0, 2349, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0};
+
+	int noteDurations[] = {63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42};
+
+	// iterate over the notes of the melody:
+	for (int thisNote = 0; thisNote < 64; thisNote++)
+	{
+		int noteDuration = noteDurations[thisNote];
+
+		if (melody[thisNote])
+		{
+			tone(A2, melody[thisNote]);
+			delay(noteDuration);
+			noTone(A2);
+		} else
+		{
+			delay(noteDuration);	
+		}		
+	}
+	display.enableDisplay();
+}
+
 void increaseBrightness()
 {
   brightness+=15;
@@ -251,6 +291,9 @@ void singleClickB()
 		digitValues[activeDigit]++;
 		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
 		display.writeDigit(activeDigit, digitValues[activeDigit]);
+	} else if (fsmState == SHOW_TIME_MODE)
+	{
+		playSong();
 	}
 }
 
@@ -294,16 +337,16 @@ void setup()
 	// initialize serial
 	Serial.begin(9600);
 
-  // initialize rtc
-  setSyncProvider(RTC.get);
-  setSyncInterval(2);
-  if(timeStatus()!= timeSet) 
-     Serial.println("Unable to sync with the RTC");
-  else
-     Serial.println("RTC has set the system time"); 
+	// initialize rtc
+	setSyncProvider(RTC.get);
+	setSyncInterval(2);
+	if(timeStatus()!= timeSet) 
+		Serial.println("Unable to sync with the RTC");
+	else
+		Serial.println("RTC has set the system time"); 
 
-  // set Brightness for the display
-  display.setBrightness(brightness);    
+	// set Brightness for the display
+	display.setBrightness(brightness);    
 }
 
 void loop()
