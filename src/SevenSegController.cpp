@@ -44,9 +44,14 @@ SevenSegController::SevenSegController(int muxPin0, int muxPin1, int muxPin2, in
     Timer1.attachInterrupt(handle_interrupt);
 }
 
-void SevenSegController::writeDigit(byte digit, byte value)
+void SevenSegController::writeDigit(byte digit, char value)
 {
   _digitValues[digit] = value;
+}
+
+void SevenSegController::writeDigit(byte digit, byte value)
+{
+  _digitValues[digit] = (char) value;
 }
 
 void SevenSegController::disableDigit(byte digit)
@@ -269,42 +274,77 @@ void SevenSegController::muxDisplay(void)
 }
 
 
-byte SevenSegController::translateDigit(byte digit)
+byte SevenSegController::translateDigit(char digit)
 {
+  byte returnVal = 0;
+
   switch (digit)
   {
     case 0:
-      return B00000011;
+    case 'O':
+      returnVal =  B00000011;
       break;
     case 1:
-      return B10011111;
+      returnVal =  B10011111;
       break;
     case 2:
-      return B00100101;
+      returnVal =  B00100101;
       break;
     case 3:
-      return B00001101;
+      returnVal =  B00001101;
       break;
     case 4:
-      return B10011001;
+      returnVal =  B10011001;
       break;
     case 5:
-      return B01001001;
+      returnVal =  B01001001;
       break;
     case 6:
-      return B01000001;
+      returnVal =  B01000001;
       break;
     case 7:
-      return B00011111;
+      returnVal =  B00011111;
       break;
     case 8:
-      return B00000001;
+      returnVal =  B00000001;
       break;
     case 9:
-      return B00001001;
+      returnVal =  B00001001;
+      break;
+    case 'A':
+    case 'R':
+      returnVal =  B00010001;
+      break;
+    case 'a':
+    case 'o':
+      returnVal =  B11000101;
+      break;
+    case 'f':
+    case 'F':
+      returnVal =  B01110001;
+      break;
+    case 'n':
+      returnVal =  B11010101;
+      break;
+    case 'N':
+      returnVal =  B00010011;
+      break;  
+    case 'h':
+      returnVal =  B11010001;
+      break;
+    case 'l':
+      returnVal =  B11100011; 
+      break;  
+    case 'r':
+      returnVal =  B11110101; 
+      break;      
+    case 'u':
+      returnVal =  B11000111;
       break;
     default:
-      return B11111110;
+      returnVal =  B11111111;
       break;
   }
+
+  return returnVal;
 }

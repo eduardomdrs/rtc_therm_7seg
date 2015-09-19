@@ -17,6 +17,7 @@ class SevenSegController
     SevenSegController(int muxPin0, int muxPin1, int muxPin2, int muxPin3, int colonPin, int degreePin, int latchPin, int dataPin, int clkPin);
     
     // write a single digit
+    void writeDigit(byte digit, char value);
     void writeDigit(byte digit, byte value);
 
     // control functions - single digits
@@ -52,7 +53,7 @@ class SevenSegController
     static SevenSegController *active_object;
 
     volatile int _selectedDigit;
-    byte _digitValues[_NO_DIGITS]; // stores the values to display for each digit
+    char _digitValues[_NO_DIGITS]; // stores the values to display for each digit
     byte _digitStatus[_NO_DIGITS]; // 0: disabled, 1: enabled, 2: blinking
     byte _showDecimal[_NO_DIGITS]; // 1: show, 0: do not show
     int _blinkCounter[_NO_DIGITS]; // used for timing blink pattern
@@ -64,7 +65,7 @@ class SevenSegController
     int _dataPin;
     int _clkPin;
     
-    byte translateDigit(byte digit); // translates from binary to common anode segments
+    byte translateDigit(char digit); // translates from binary to common anode segments
     void muxDisplay(void); // interrupt routine controlling display multiplexing
 };
 
