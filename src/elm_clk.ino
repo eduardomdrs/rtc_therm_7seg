@@ -136,6 +136,23 @@ void setRtcAlarm(byte hour, byte minute)
 	RTC.sramWrite(ALARM_M_ADDR, minute);
 }
 
+// Debug statements, print new alarm / status to serial port.
+void printAlarmStatus()
+{
+	byte h, m, rtcOn;
+	Serial.print("New alarm time: ");
+	h = RTC.sramRead(ALARM_H_ADDR);
+	Serial.print(h);
+	Serial.print(":");
+	m = RTC.sramRead(ALARM_M_ADDR);
+	Serial.print(m);
+	rtcOn = isRtcAlarmOn();
+	if (rtcOn)
+		Serial.println(" -- ON");
+	else
+		Serial.println(" -- OFF");
+}
+
 // ---------------------- //
 //  Display Update fnc
 // ---------------------- //
@@ -316,11 +333,15 @@ void longPressA()
 				disableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.disableDecimalPoint(i);
+
+				printAlarmStatus();
 			} else 
 			{
 				enableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.enableDecimalPoint(i);
+
+				printAlarmStatus();
 			}
 			break;
 
@@ -358,24 +379,11 @@ void longPressB()
 	switch(fsmState)
 	{
 		case EDIT_ALARM_MODE:
-			byte h, m, rtcOn;
+			byte h, m;
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
 			setRtcAlarm(h,m);
-
-			// Debug statements, print new alarm / status to serial port.
-			Serial.print("New alarm time: ");
-			h = RTC.sramRead(ALARM_H_ADDR);
-			Serial.print(h);
-			Serial.print(":");
-			m = RTC.sramRead(ALARM_M_ADDR);
-			Serial.print(m);
-			rtcOn = isRtcAlarmOn();
-			if (rtcOn)
-				Serial.println(" -- ON");
-			else
-				Serial.println(" -- OFF");
-
+			printAlarmStatus();
   			fsmState = SHOW_TIME_MODE;
   			break;
 
@@ -416,9 +424,13 @@ void setup()
 	setSyncProvider(RTC.get);
 	setSyncInterval(2);
 	if(timeStatus()!= timeSet) 
+	{
 		Serial.println("Unable to sync with the RTC");
-	else
+	} else
+	{
 		Serial.println("RTC has set the system time"); 
+		fsmState = ERROR_MODE;
+	}
 	
 	pinMode(ALARM_PIN, INPUT_PULLUP);
 	setRtcAlarm(8,30);
@@ -427,8 +439,11 @@ void setup()
 
 void loop()
 {
-	buttonA.tick();
-	buttonB.tick();
+	if (fsmState != ERROR_MODE)
+	{
+		buttonA.tick();
+		buttonB.tick();
+	}
 
 	switch (fsmState)
 	{
@@ -525,6 +540,15 @@ void loop()
 			break;
 
 		case ERROR_MODE:
+			if (oldFsmState != fsmState)
+			{	
+				display.writeMessage("ERRO");
+				Serial.println("Error detected, disabling buttons.");
+				Serial.println("Error detected, disabling RTC alarm.");
+				disableRtcAlarm();
+			}
+			break;
+
 		default:
 			break;
 	}
