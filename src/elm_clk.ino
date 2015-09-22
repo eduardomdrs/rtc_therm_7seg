@@ -1,14 +1,12 @@
-#include <Wire.h>
-#include <OneWire.h>
-#include <TimerOne.h>
 #include <DallasTemperature.h>
-#include <OneButton.h>
-#include <Time.h>
 #include <MCP79412RTC.h>
-#include <avr/pgmspace.h>
+#include <OneButton.h>
+#include <OneWire.h>
+#include <Time.h>
+#include <TimerOne.h>
+#include <Wire.h>
 
 #include "SevenSegController.h"
-#include "pitches.h"
 
 // ---------------------- //
 //  display control pins
@@ -38,8 +36,9 @@
 //  alarm pins / addr
 // ---------------------- //
 #define ALARM_PIN A3
-#define ALARM_H_ADDR 0x20
-#define ALARM_M_ADDR 0x21
+#define ALARM_H_ADDR  0x20
+#define ALARM_M_ADDR  0x21
+#define ALARM_ON_ADDR 0x22
 
 // ---------------------- //
 //  FSM definitions
@@ -55,9 +54,9 @@
 #define SHOW_TEMP_DURATION 3000
 
 // ---------------------- //
-//  RTC definitions
+//  Common definitions
 // ---------------------- //
-#define N 4
+#define N 4 // number of LCD digits
 
 // ---------------------- //
 //  Globals
@@ -66,7 +65,6 @@ byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
 byte digitValues[N] = {0,0,0,0};
-byte alarmOn		= 0; // default state is OFF
 int  tempInCelsius  = 0;
 unsigned long updateInterval    = 100;
 unsigned long lastTempRead      = 0;
@@ -81,9 +79,9 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
 
-// ---------------------- //
-//  RTC test functions
-// ---------------------- //
+// ----------------------------- //
+//  RTC control/test functions
+// ----------------------------- //
 void rtcStatus()
 {
   timeStatus_t rtcSta = timeStatus();
@@ -98,6 +96,45 @@ void rtcStatus()
     Serial.println("error");
 }
 
+void enableRtcAlarm()
+{
+	RTC.enableAlarm(ALARM_0, ALM_MATCH_HOURS);
+	RTC.enableAlarm(ALARM_1, ALM_MATCH_MINUTES);
+	RTC.alarmPolarity(LOW);
+
+	// save status to SRAM, easier retrieval
+	RTC.sramWrite(ALARM_ON_ADDR, 1);
+}
+
+void disableRtcAlarm()
+{
+	RTC.enableAlarm(ALARM_0, ALM_DISABLE);
+	RTC.enableAlarm(ALARM_1, ALM_DISABLE);
+	
+	// save status to SRAM, easier retrieval
+	RTC.sramWrite(ALARM_ON_ADDR, 0);
+}
+
+byte isRtcAlarmOn()
+{
+	byte alarmOn = RTC.sramRead(ALARM_ON_ADDR);
+	return alarmOn;
+}
+
+void setRtcAlarm(byte hour, byte minute)
+{	
+	tmElements_t hourSetting;
+	hourSetting.Hour = hour;
+	RTC.setAlarm(ALARM_0, makeTime(hourSetting));
+
+	tmElements_t minuteSetting;
+	minuteSetting.Minute = minute;
+	RTC.setAlarm(ALARM_1, makeTime(minuteSetting));
+
+	// save alarm setting to parts of SRAM, easier retrieval
+	RTC.sramWrite(ALARM_H_ADDR, hour);
+	RTC.sramWrite(ALARM_M_ADDR, minute);
+}
 
 // ---------------------- //
 //  Display Update fnc
@@ -274,14 +311,14 @@ void longPressA()
   			break;
 
 		case EDIT_ALARM_MODE:
-			if (alarmOn)
+			if (isRtcAlarmOn())
 			{
-				alarmOn = 0;
+				disableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.disableDecimalPoint(i);
 			} else 
 			{
-				alarmOn = 1;
+				enableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.enableDecimalPoint(i);
 			}
@@ -321,21 +358,23 @@ void longPressB()
 	switch(fsmState)
 	{
 		case EDIT_ALARM_MODE:
-			int h;
-			int m;
+			byte h, m, rtcOn;
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
-			RTC.sramWrite(0x20, h);
-			RTC.sramWrite(0x21, m);
-			//setTime(h, m, 0, 1, 1, 2015);
-  			//RTC.set(now());
+			setRtcAlarm(h,m);
 
+			// Debug statements, print new alarm / status to serial port.
 			Serial.print("New alarm time: ");
-			h = RTC.sramRead(0x20);
+			h = RTC.sramRead(ALARM_H_ADDR);
 			Serial.print(h);
 			Serial.print(":");
-			m = RTC.sramRead(0x21);
-			Serial.println(m);
+			m = RTC.sramRead(ALARM_M_ADDR);
+			Serial.print(m);
+			rtcOn = isRtcAlarmOn();
+			if (rtcOn)
+				Serial.println(" -- ON");
+			else
+				Serial.println(" -- OFF");
 
   			fsmState = SHOW_TIME_MODE;
   			break;
@@ -382,8 +421,8 @@ void setup()
 		Serial.println("RTC has set the system time"); 
 	
 	pinMode(ALARM_PIN, INPUT_PULLUP);
-	RTC.sramWrite(ALARM_H_ADDR,  8);
-	RTC.sramWrite(ALARM_M_ADDR, 30);
+	setRtcAlarm(8,30);
+	disableRtcAlarm();
 }
 
 void loop()
@@ -419,7 +458,7 @@ void loop()
 				updateAlarm();
 				display.enableClockDisplay();
 
-				if (alarmOn)
+				if (isRtcAlarmOn())
 				{
 					for (int i = 0; i < N; i++)
 						display.enableDecimalPoint(i);
