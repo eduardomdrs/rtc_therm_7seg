@@ -325,6 +325,9 @@ byte SevenSegController::translateDigit(char digit)
     case 'o':
       returnVal =  B11000101;
       break;
+    case 'E':
+      returnVal =  B01100001;
+      break;
     case 'f':
     case 'F':
       returnVal =  B01110001;
