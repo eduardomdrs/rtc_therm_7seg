@@ -47,8 +47,8 @@
 #define EDIT_ALARM_MODE 1
 #define SHOW_TIME_MODE  2
 #define SHOW_TEMP_MODE  3
-#define ERROR_MODE      4
-
+#define SHOW_ALARM_MODE 4
+#define ERROR_MODE      5
 
 #define SHOW_TIME_DURATION 7000
 #define SHOW_TEMP_DURATION 3000
@@ -432,6 +432,7 @@ void setup()
 		fsmState = ERROR_MODE;
 	}
 	
+	// default alarm settings, 08:30, disabled
 	pinMode(ALARM_PIN, INPUT_PULLUP);
 	setRtcAlarm(8,30);
 	disableRtcAlarm();
@@ -439,10 +440,18 @@ void setup()
 
 void loop()
 {
+	// If not in error state, increment button ticks
 	if (fsmState != ERROR_MODE)
 	{
 		buttonA.tick();
 		buttonB.tick();
+	}
+
+	// If alarm condition is detected, modify FSM state accordingly
+	// When an alarm is triggered, the alarm pin is pulled low.
+	if (!digitalRead(ALARM_PIN))
+	{
+		fsmState = SHOW_ALARM_MODE;
 	}
 
 	switch (fsmState)
@@ -537,6 +546,14 @@ void loop()
 				fsmState = SHOW_TIME_MODE;
 			}
 
+			break;
+
+		case SHOW_ALARM_MODE:
+			if (RTC.alarm(ALARM_0) | (RTC.alarm(ALARM_1)))
+				Serial.println("Alarm!");
+			else
+				oldFsmState = fsmState;
+				fsmState = SHOW_TIME_MODE;
 			break;
 
 		case ERROR_MODE:
