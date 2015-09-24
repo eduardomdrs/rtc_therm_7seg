@@ -50,9 +50,9 @@
 #define SHOW_ALARM_MODE 4
 #define ERROR_MODE      5
 
-#define SHOW_TIME_DURATION 7000
-#define SHOW_TEMP_DURATION 3000
-
+#define SHOW_TIME_DURATION    7000
+#define SHOW_TEMP_DURATION    3000
+#define ALARM_CLEAR_DURATION 61000
 // ---------------------- //
 //  Common definitions
 // ---------------------- //
@@ -65,12 +65,15 @@ byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
 byte digitValues[N] = {0,0,0,0};
+byte alarmTriggeredToday = 0;
 int  tempInCelsius  = 0;
 unsigned long updateInterval    = 100;
 unsigned long lastTempRead      = 0;
 unsigned long lastClockRead     = 0;
 unsigned long lastShowTimeStart = 0;
 unsigned long lastShowTempStart = 0;
+unsigned long lastAlarmCleared  = 0;
+
 
 SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
 OneButton buttonA(BUTTON_A_PIN, true);
@@ -123,6 +126,7 @@ byte isRtcAlarmOn()
 
 void setRtcAlarm(byte hour, byte minute)
 {	
+	alarmTriggeredToday = 0;
 	tmElements_t hourSetting;
 	hourSetting.Hour = hour;
 	RTC.setAlarm(ALARM_0, makeTime(hourSetting));
@@ -299,7 +303,7 @@ void doubleClickA()
 		activeDigit+=2;
 		activeDigit %= N;
 		display.enableBlink(activeDigit);
-	}	
+	}
 }
 
 void singleClickA()
@@ -310,6 +314,13 @@ void singleClickA()
 		activeDigit++;
 		activeDigit %= N;
 		display.enableBlink(activeDigit);
+	} else if (fsmState == SHOW_ALARM_MODE)
+	{
+		lastAlarmCleared = millis();
+		oldFsmState = SHOW_ALARM_MODE;
+		fsmState    = SHOW_TIME_MODE;
+		Serial.print("ALARM CLEARED :");
+		digitalClockDisplay();
 	}
 }
 
@@ -368,9 +379,13 @@ void singleClickB()
 		digitValues[activeDigit]++;
 		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
 		display.writeDigit(activeDigit, digitValues[activeDigit]);
-	} else if (fsmState == SHOW_TIME_MODE)
+	} else if (fsmState == SHOW_ALARM_MODE)
 	{
-		playSong();
+		lastAlarmCleared = millis();
+		oldFsmState = SHOW_ALARM_MODE;
+		fsmState    = SHOW_TIME_MODE;
+		Serial.print("ALARM CLEARED :");
+		digitalClockDisplay();
 	}
 }
 
@@ -429,18 +444,18 @@ void setup()
 	} else
 	{
 		Serial.println("RTC has set the system time"); 
-		fsmState = ERROR_MODE;
+		//fsmState = ERROR_MODE;
 	}
 	
 	// default alarm settings, 08:30, disabled
 	pinMode(ALARM_PIN, INPUT_PULLUP);
-	setRtcAlarm(8,30);
-	disableRtcAlarm();
+	//setRtcAlarm(8,30);
+	//disableRtcAlarm();
 }
 
 void loop()
 {
-	// If not in error state, increment button ticks
+	// If error detected, disable buttons.
 	if (fsmState != ERROR_MODE)
 	{
 		buttonA.tick();
@@ -449,10 +464,13 @@ void loop()
 
 	// If alarm condition is detected, modify FSM state accordingly
 	// When an alarm is triggered, the alarm pin is pulled low.
-	if (!digitalRead(ALARM_PIN))
+	if (!digitalRead(ALARM_PIN) && !alarmTriggeredToday)
 	{
-		fsmState = SHOW_ALARM_MODE;
+		oldFsmState = fsmState;
+		fsmState    = SHOW_ALARM_MODE;
+		alarmTriggeredToday = 1;
 	}
+
 
 	switch (fsmState)
 	{
@@ -510,6 +528,11 @@ void loop()
 
 			oldFsmState = fsmState;
 
+			if (alarmTriggeredToday && ((millis() - lastAlarmCleared) > ALARM_CLEAR_DURATION))
+			{
+				alarmTriggeredToday = 0;
+			}
+
 			if ((millis() - lastClockRead) > updateInterval)
 			{
 				updateTime();
@@ -549,11 +572,8 @@ void loop()
 			break;
 
 		case SHOW_ALARM_MODE:
-			if (RTC.alarm(ALARM_0) | (RTC.alarm(ALARM_1)))
-				Serial.println("Alarm!");
-			else
-				oldFsmState = fsmState;
-				fsmState = SHOW_TIME_MODE;
+			Serial.print("ALARM TRIGGERED :");
+			digitalClockDisplay();
 			break;
 
 		case ERROR_MODE:
