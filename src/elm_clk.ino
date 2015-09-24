@@ -441,16 +441,16 @@ void setup()
 	if(timeStatus()!= timeSet) 
 	{
 		Serial.println("Unable to sync with the RTC");
+		fsmState = ERROR_MODE;
 	} else
 	{
 		Serial.println("RTC has set the system time"); 
-		//fsmState = ERROR_MODE;
 	}
 	
 	// default alarm settings, 08:30, disabled
 	pinMode(ALARM_PIN, INPUT_PULLUP);
-	//setRtcAlarm(8,30);
-	//disableRtcAlarm();
+	setRtcAlarm(8,30);
+	disableRtcAlarm();
 }
 
 void loop()
@@ -579,6 +579,7 @@ void loop()
 		case ERROR_MODE:
 			if (oldFsmState != fsmState)
 			{	
+				display.enableNumericDisplay();
 				display.writeMessage("ERRO");
 				Serial.println("Error detected, disabling buttons.");
 				Serial.println("Error detected, disabling RTC alarm.");
