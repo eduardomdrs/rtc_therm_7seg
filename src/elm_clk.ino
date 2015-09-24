@@ -82,6 +82,33 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
 
+// -------------------------------------- //
+//  Debug helper serial print functions
+// -------------------------------------- //
+void printDigits(int digits, char separator)
+{
+  // utility function for digital clock display: prints preceding separator and leading 0
+  Serial.print(separator);
+  if(digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+void digitalClockDisplay()
+{
+	time_t t = now();
+	printDigits(hour(t)  ,' ');
+	printDigits(minute(t),':');
+	printDigits(second(t),':');
+	Serial.print(" ");
+	Serial.print(day(t));
+	Serial.print(" ");
+	Serial.print(month(t));
+	Serial.print(" ");
+	Serial.print(year(t)); 
+	Serial.println(); 
+}
+
 // ----------------------------- //
 //  RTC control/test functions
 // ----------------------------- //
@@ -146,10 +173,9 @@ void printAlarmStatus()
 	byte h, m, rtcOn;
 	Serial.print("New alarm time: ");
 	h = RTC.sramRead(ALARM_H_ADDR);
-	Serial.print(h);
-	Serial.print(":");
 	m = RTC.sramRead(ALARM_M_ADDR);
-	Serial.print(m);
+	printDigits(h,' ');
+	printDigits(m,':');
 	rtcOn = isRtcAlarmOn();
 	if (rtcOn)
 		Serial.println(" -- ON");
@@ -203,30 +229,6 @@ void updateTemperature()
 	display.writeDigit(0,digitValues[0]);
 	display.writeDigit(1,digitValues[1]);
 	display.writeDigit(2,digitValues[2]);
-}
-
-void printDigits(int digits)
-{
-  // utility function for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
-}
-
-void digitalClockDisplay()
-{
-	time_t t = now();
-	Serial.print(hour(t));
-	printDigits(minute(t));
-	printDigits(second(t));
-	Serial.print(" ");
-	Serial.print(day(t));
-	Serial.print(" ");
-	Serial.print(month(t));
-	Serial.print(" ");
-	Serial.print(year(t)); 
-	Serial.println(); 
 }
 
 int maxValueForDigit(int digit)
