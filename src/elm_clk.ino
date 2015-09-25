@@ -52,7 +52,7 @@
 
 #define SHOW_TIME_DURATION    7000
 #define SHOW_TEMP_DURATION    3000
-#define ALARM_CLEAR_DURATION 61000
+#define ALARM_CLEAR_DURATION 60001
 // ---------------------- //
 //  Common definitions
 // ---------------------- //
@@ -65,17 +65,18 @@ byte oldFsmState    = 255;
 byte fsmState       = 0;
 byte activeDigit    = 0;
 byte digitValues[N] = {0,0,0,0};
-byte alarmTriggeredToday = 0;
 int  tempInCelsius  = 0;
 unsigned long updateInterval    = 100;
 unsigned long lastTempRead      = 0;
 unsigned long lastClockRead     = 0;
 unsigned long lastShowTimeStart = 0;
 unsigned long lastShowTempStart = 0;
+unsigned long lastAlarmTrigger  = 0;
 unsigned long lastAlarmCleared  = 0;
 
 
-SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
+SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, 
+	COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
 OneButton buttonA(BUTTON_A_PIN, true);
 OneButton buttonB(BUTTON_B_PIN, true);
 OneWire oneWire(ONE_WIRE_BUS);
@@ -87,7 +88,8 @@ DeviceAddress devAddr;
 // -------------------------------------- //
 void printDigits(int digits, char separator)
 {
-  // utility function for digital clock display: prints preceding separator and leading 0
+  // Utility function for digital clock display: prints preceding 
+  // separator and leading 0
   Serial.print(separator);
   if(digits < 10)
     Serial.print('0');
@@ -153,7 +155,6 @@ byte isRtcAlarmOn()
 
 void setRtcAlarm(byte hour, byte minute)
 {	
-	alarmTriggeredToday = 0;
 	tmElements_t hourSetting;
 	hourSetting.Hour = hour;
 	RTC.setAlarm(ALARM_0, makeTime(hourSetting));
@@ -165,6 +166,8 @@ void setRtcAlarm(byte hour, byte minute)
 	// save alarm setting to parts of SRAM, easier retrieval
 	RTC.sramWrite(ALARM_H_ADDR, hour);
 	RTC.sramWrite(ALARM_M_ADDR, minute);
+
+	lastAlarmTrigger = 0;
 }
 
 // Debug statements, print new alarm / status to serial port.
@@ -275,9 +278,16 @@ int maxValueForDigit(int digit)
 void playSong()
 {
 	display.disableDisplay();
-	int melody[] = {1319, 0, 1319, 0, 1319, 0, 1319, 0, 1976, 0, 1976, 0, 1976, 0, 1976, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1976, 0, 1976, 0, 1976, 0, 1976, 0, 2349, 0, 2349, 0, 2349, 0, 2349, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0};
+	int melody[] = {1319, 0, 1319, 0, 1319, 0, 1319, 0, 1976, 0, 1976, 0, 1976,
+	 0, 1976, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1976, 0, 1976, 0, 1976, 0, 
+	 1976, 0, 2349, 0, 2349, 0, 2349, 0, 2349, 0, 1760, 0, 1760, 0, 1760, 0,
+	  1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0,
+	   1760, 0};
 
-	int noteDurations[] = {63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42};
+	int noteDurations[] = {63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63,
+	 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
+	  63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
+	   63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42};
 
 	// iterate over the notes of the melody:
 	for (int thisNote = 0; thisNote < 64; thisNote++)
@@ -466,11 +476,12 @@ void loop()
 
 	// If alarm condition is detected, modify FSM state accordingly
 	// When an alarm is triggered, the alarm pin is pulled low.
-	if (!digitalRead(ALARM_PIN) && !alarmTriggeredToday)
+	//if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && !alarmTriggeredToday)
+	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && (millis()-lastAlarmTrigger) > ALARM_CLEAR_DURATION)
 	{
 		oldFsmState = fsmState;
 		fsmState    = SHOW_ALARM_MODE;
-		alarmTriggeredToday = 1;
+		lastAlarmTrigger = millis();
 	}
 
 
@@ -529,11 +540,6 @@ void loop()
 			}
 
 			oldFsmState = fsmState;
-
-			if (alarmTriggeredToday && ((millis() - lastAlarmCleared) > ALARM_CLEAR_DURATION))
-			{
-				alarmTriggeredToday = 0;
-			}
 
 			if ((millis() - lastClockRead) > updateInterval)
 			{
