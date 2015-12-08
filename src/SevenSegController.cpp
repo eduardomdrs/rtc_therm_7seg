@@ -56,7 +56,7 @@ void SevenSegController::writeDigit(byte digit, byte value)
 
 void SevenSegController::writeMessage(const char* msg)
 {
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < _NO_DIGITS; i++)
     writeDigit(i, msg[i]);
 }
 
@@ -97,8 +97,7 @@ void SevenSegController::setBrightness(byte brightness)
 
 void SevenSegController::enableDegreeSign()
 {
-  //digitalWrite(_degreePin, HIGH);
-  analogWrite(_degreePin, _brightness);
+  digitalWrite(_degreePin, HIGH);
 }
 
 void SevenSegController::disableDegreeSign()
@@ -108,8 +107,7 @@ void SevenSegController::disableDegreeSign()
 
 void SevenSegController::enableColon()
 {
-  //digitalWrite(_colonPin, HIGH);
-  analogWrite(_colonPin, _brightness);
+  digitalWrite(_colonPin, HIGH);
 }
 
 void SevenSegController::disableColon()
@@ -243,40 +241,42 @@ void SevenSegController::handle_interrupt()
 
 void SevenSegController::muxDisplay(void)
 {
-   byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
-   digitalWrite(_latchPin, LOW);
-   shiftOut(_dataPin, _clkPin, LSBFIRST, value);
+  byte value = ( (translateDigit(_digitValues[_selectedDigit])) & _showDecimal[_selectedDigit] );
+  digitalWrite(_latchPin, LOW);
+  shiftOut(_dataPin, _clkPin, LSBFIRST, value);
 
-   digitalWrite(_muxPins[0], LOW);
-   digitalWrite(_muxPins[1], LOW);
-   digitalWrite(_muxPins[2], LOW);
-   digitalWrite(_muxPins[3], LOW);
+  digitalWrite(_muxPins[0], LOW);
+  digitalWrite(_muxPins[1], LOW);
+  digitalWrite(_muxPins[2], LOW);
+  digitalWrite(_muxPins[3], LOW);
 
-   if (_digitStatus[_selectedDigit] == 1)
-   {
+  if (_digitStatus[_selectedDigit] == _ENABLE_DIGIT)
+  {
+    digitalWrite(_muxPins[_selectedDigit], HIGH);
 
-     digitalWrite(_muxPins[_selectedDigit], HIGH);
+  } else if (_digitStatus[_selectedDigit] == _BLINK_DIGIT)
+  {
+    
+    if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
+    {
+      
+      if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
+      {
+        digitalWrite(_muxPins[_selectedDigit], HIGH);
+      }
 
-   } else if (_digitStatus[_selectedDigit] == 2)
-   {
-     if (_blinkCounter[_selectedDigit] < 2 * _BLINK_PERIOD)
-     {
-       if (_blinkCounter[_selectedDigit] < _BLINK_PERIOD)
-       {
-         digitalWrite(_muxPins[_selectedDigit], HIGH);
-       }
-       _blinkCounter[_selectedDigit]++;
+      _blinkCounter[_selectedDigit]++;
 
-     } else {
-       _blinkCounter[_selectedDigit] = 0;
-     }
-   }
+    } else
+    {
+      _blinkCounter[_selectedDigit] = 0;
+    }
+  }
 
-   digitalWrite(_latchPin, HIGH);
+  digitalWrite(_latchPin, HIGH);
 
-   _selectedDigit++;
-   if (_selectedDigit == 4)
-     _selectedDigit = 0;
+  _selectedDigit++;
+  _selectedDigit %= _NO_DIGITS;
 }
 
 

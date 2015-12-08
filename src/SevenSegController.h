@@ -59,7 +59,7 @@ class SevenSegController
     byte _showDecimal[_NO_DIGITS]; // 1: show, 0: do not show
     int _blinkCounter[_NO_DIGITS]; // used for timing blink pattern
     byte _brightness;  // define brightness from 0 to 255
-    int _muxPins[4];
+    int _muxPins[_NO_DIGITS];
     int _colonPin;
     int _degreePin;
     int _latchPin;

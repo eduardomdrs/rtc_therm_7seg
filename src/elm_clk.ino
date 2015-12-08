@@ -53,6 +53,25 @@
 #define SHOW_TIME_DURATION    7000
 #define SHOW_TEMP_DURATION    3000
 #define ALARM_CLEAR_DURATION 60001
+
+// ---------------------- //
+//  Alarm variables
+// ---------------------- //
+#define SONG_DURATION 64
+
+int notePosition = 0;
+
+int melody[] = {1319, 0, 1319, 0, 1319, 0, 1319, 0, 1976, 0, 1976, 0, 1976,
+ 0, 1976, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1976, 0, 1976, 0, 1976, 0, 
+ 1976, 0, 2349, 0, 2349, 0, 2349, 0, 2349, 0, 1760, 0, 1760, 0, 1760, 0,
+  1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0,
+   1760, 0};
+
+int noteDurations[] = {63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63,
+ 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
+  63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
+   63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42};
+
 // ---------------------- //
 //  Common definitions
 // ---------------------- //
@@ -71,9 +90,6 @@ unsigned long lastTempRead      = 0;
 unsigned long lastClockRead     = 0;
 unsigned long lastShowTimeStart = 0;
 unsigned long lastShowTempStart = 0;
-unsigned long lastAlarmTrigger  = 0;
-unsigned long lastAlarmCleared  = 0;
-
 
 SevenSegController display(DIGIT0_PIN, DIGIT1_PIN, DIGIT2_PIN, DIGIT3_PIN, 
 	COLON_PIN, DEGREE_PIN, LATCH_PIN, DATA_PIN, CLOCK_PIN);
@@ -83,56 +99,14 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
 
-// -------------------------------------- //
-//  Debug helper serial print functions
-// -------------------------------------- //
-void printDigits(int digits, char separator)
-{
-  // Utility function for digital clock display: prints preceding 
-  // separator and leading 0
-  Serial.print(separator);
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
-}
-
-void digitalClockDisplay()
-{
-	time_t t = now();
-	printDigits(hour(t)  ,' ');
-	printDigits(minute(t),':');
-	printDigits(second(t),':');
-	Serial.print(" ");
-	Serial.print(day(t));
-	Serial.print(" ");
-	Serial.print(month(t));
-	Serial.print(" ");
-	Serial.print(year(t)); 
-	Serial.println(); 
-}
-
 // ----------------------------- //
-//  RTC control/test functions
+//  RTC alarm functions
 // ----------------------------- //
-void rtcStatus()
-{
-  timeStatus_t rtcSta = timeStatus();
-  
-  if(rtcSta == timeSet)
-    Serial.println("Time's clock has been set.");
-  else if (rtcSta == timeNotSet)
-    Serial.println("Time's clock has not been set.");
-  else if (rtcSta == timeNeedsSync)
-    Serial.println("Time's clock is set, but the sync has failed.");
-  else
-    Serial.println("error");
-}
-
 void enableRtcAlarm()
 {
 	RTC.enableAlarm(ALARM_0, ALM_MATCH_HOURS);
 	RTC.enableAlarm(ALARM_1, ALM_MATCH_MINUTES);
-	RTC.alarmPolarity(LOW);
+	//RTC.alarmPolarity(LOW);
 
 	// save status to SRAM, easier retrieval
 	RTC.sramWrite(ALARM_ON_ADDR, 1);
@@ -147,43 +121,55 @@ void disableRtcAlarm()
 	RTC.sramWrite(ALARM_ON_ADDR, 0);
 }
 
+void setRtcAlarm(byte hour, byte minute)
+{	
+	// copy time_t object, modify some fields, 
+	// inherit month, day, dayOfWeek and Year.
+	time_t justNow = now();
+	tmElements_t alarmSetting;
+	breakTime(justNow, alarmSetting);
+
+	alarmSetting.Hour = hour;
+	alarmSetting.Minute = minute;
+	alarmSetting.Second = 0;
+	RTC.setAlarm(ALARM_0, makeTime(alarmSetting));
+	RTC.setAlarm(ALARM_1, makeTime(alarmSetting));
+
+	// save alarm setting to parts of SRAM, easier retrieval
+	RTC.sramWrite(ALARM_H_ADDR, hour);
+	RTC.sramWrite(ALARM_M_ADDR, minute);
+}
+
+void stopAlarmCallback()
+{
+	oldFsmState = SHOW_ALARM_MODE;
+	fsmState    = SHOW_TIME_MODE;
+	disableRtcAlarm();
+	notePosition = 0;
+}
+
 byte isRtcAlarmOn()
 {
 	byte alarmOn = RTC.sramRead(ALARM_ON_ADDR);
 	return alarmOn;
 }
 
-void setRtcAlarm(byte hour, byte minute)
+void playAlarmSong()
 {	
-	tmElements_t hourSetting;
-	hourSetting.Hour = hour;
-	RTC.setAlarm(ALARM_0, makeTime(hourSetting));
+	int noteDuration = noteDurations[notePosition];	
 
-	tmElements_t minuteSetting;
-	minuteSetting.Minute = minute;
-	RTC.setAlarm(ALARM_1, makeTime(minuteSetting));
-
-	// save alarm setting to parts of SRAM, easier retrieval
-	RTC.sramWrite(ALARM_H_ADDR, hour);
-	RTC.sramWrite(ALARM_M_ADDR, minute);
-
-	lastAlarmTrigger = 0;
-}
-
-// Debug statements, print new alarm / status to serial port.
-void printAlarmStatus()
-{
-	byte h, m, rtcOn;
-	Serial.print("New alarm time: ");
-	h = RTC.sramRead(ALARM_H_ADDR);
-	m = RTC.sramRead(ALARM_M_ADDR);
-	printDigits(h,' ');
-	printDigits(m,':');
-	rtcOn = isRtcAlarmOn();
-	if (rtcOn)
-		Serial.println(" -- ON");
-	else
-		Serial.println(" -- OFF");
+	if (melody[notePosition])
+	{
+		tone(A2, melody[notePosition]);
+		delay(noteDuration);
+		noTone(A2);
+	} else
+	{
+		delay(noteDuration);	
+	}
+	notePosition++;
+	// roll over, once finished;
+	notePosition %= SONG_DURATION; 
 }
 
 // ---------------------- //
@@ -275,65 +261,32 @@ int maxValueForDigit(int digit)
 // ---------------------- //
 //  Button callbacks
 // ---------------------- //
-void playSong()
+void implClickA(int value)
 {
-	display.disableDisplay();
-	int melody[] = {1319, 0, 1319, 0, 1319, 0, 1319, 0, 1976, 0, 1976, 0, 1976,
-	 0, 1976, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1976, 0, 1976, 0, 1976, 0, 
-	 1976, 0, 2349, 0, 2349, 0, 2349, 0, 2349, 0, 1760, 0, 1760, 0, 1760, 0,
-	  1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0, 1760, 0,
-	   1760, 0};
-
-	int noteDurations[] = {63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63,
-	 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
-	  63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42,
-	   63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42, 63, 42};
-
-	// iterate over the notes of the melody:
-	for (int thisNote = 0; thisNote < 64; thisNote++)
+	switch (fsmState)
 	{
-		int noteDuration = noteDurations[thisNote];
+		case EDIT_TIME_MODE:
+		case EDIT_ALARM_MODE:
+			display.disableBlink(activeDigit);
+			activeDigit += value;
+			activeDigit %= N;
+			display.enableBlink(activeDigit);
+			break;
 
-		if (melody[thisNote])
-		{
-			tone(A2, melody[thisNote]);
-			delay(noteDuration);
-			noTone(A2);
-		} else
-		{
-			delay(noteDuration);	
-		}		
+		case SHOW_ALARM_MODE:
+			stopAlarmCallback();
+			break;
 	}
-	display.enableDisplay();
 }
 
 void doubleClickA()
 {
-	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
-	{
-		display.disableBlink(activeDigit);
-		activeDigit+=2;
-		activeDigit %= N;
-		display.enableBlink(activeDigit);
-	}
+	implClickA(2);
 }
 
 void singleClickA()
 {
-	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
-	{
-		display.disableBlink(activeDigit);
-		activeDigit++;
-		activeDigit %= N;
-		display.enableBlink(activeDigit);
-	} else if (fsmState == SHOW_ALARM_MODE)
-	{
-		lastAlarmCleared = millis();
-		oldFsmState = SHOW_ALARM_MODE;
-		fsmState    = SHOW_TIME_MODE;
-		Serial.print("ALARM CLEARED :");
-		digitalClockDisplay();
-	}
+	implClickA(1);
 }
 
 void longPressA()
@@ -357,48 +310,53 @@ void longPressA()
 				for (int i = 0; i < N; i++)
 					display.disableDecimalPoint(i);
 
-				printAlarmStatus();
+				// printAlarmStatus();
 			} else 
 			{
 				enableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.enableDecimalPoint(i);
 
-				printAlarmStatus();
+				// printAlarmStatus();
 			}
 			break;
 
 		case SHOW_TIME_MODE:
 			fsmState = EDIT_TIME_MODE;
 			break;
+
+
+		case SHOW_ALARM_MODE:
+			stopAlarmCallback();
+			break;
+	}
+}
+
+void implClickB(int value)
+{
+	switch (fsmState)
+	{
+		case EDIT_TIME_MODE:
+		case EDIT_ALARM_MODE:
+			digitValues[activeDigit] += value;
+			digitValues[activeDigit] %= maxValueForDigit(activeDigit);
+			display.writeDigit(activeDigit, digitValues[activeDigit]);
+			break;
+
+		case SHOW_ALARM_MODE:
+			stopAlarmCallback();
+			break;
 	}
 }
 
 void doubleClickB()
 {
-	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
-	{
-		digitValues[activeDigit] += 2;
-		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
-		display.writeDigit(activeDigit, digitValues[activeDigit]);
-	}
+	implClickB(2);
 }
 
 void singleClickB()
 {
-	if (fsmState == EDIT_TIME_MODE || fsmState == EDIT_ALARM_MODE)
-	{
-		digitValues[activeDigit]++;
-		digitValues[activeDigit] %= maxValueForDigit(activeDigit);
-		display.writeDigit(activeDigit, digitValues[activeDigit]);
-	} else if (fsmState == SHOW_ALARM_MODE)
-	{
-		lastAlarmCleared = millis();
-		oldFsmState = SHOW_ALARM_MODE;
-		fsmState    = SHOW_TIME_MODE;
-		Serial.print("ALARM CLEARED :");
-		digitalClockDisplay();
-	}
+	implClickB(1);
 }
 
 void longPressB()
@@ -410,12 +368,16 @@ void longPressB()
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
 			setRtcAlarm(h,m);
-			printAlarmStatus();
+			// printAlarmStatus();
   			fsmState = SHOW_TIME_MODE;
   			break;
 
 		case SHOW_TIME_MODE:
 			fsmState = EDIT_ALARM_MODE;
+			break;
+
+		case SHOW_ALARM_MODE:
+			stopAlarmCallback();
 			break;
 	}
 }
@@ -461,7 +423,7 @@ void setup()
 	
 	// default alarm settings, 08:30, disabled
 	pinMode(ALARM_PIN, INPUT_PULLUP);
-	setRtcAlarm(8,30);
+	setRtcAlarm(0,0);
 	disableRtcAlarm();
 }
 
@@ -477,13 +439,14 @@ void loop()
 	// If alarm condition is detected, modify FSM state accordingly
 	// When an alarm is triggered, the alarm pin is pulled low.
 	//if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && !alarmTriggeredToday)
-	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && (millis()-lastAlarmTrigger) > ALARM_CLEAR_DURATION)
+	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1))
 	{
 		oldFsmState = fsmState;
+		// update the time, so the display is not stuck in garbage.
+		updateTime();
+		display.enableClockDisplay();
 		fsmState    = SHOW_ALARM_MODE;
-		lastAlarmTrigger = millis();
 	}
-
 
 	switch (fsmState)
 	{
@@ -580,8 +543,9 @@ void loop()
 			break;
 
 		case SHOW_ALARM_MODE:
-			Serial.print("ALARM TRIGGERED :");
-			digitalClockDisplay();
+			display.disableDisplay();
+			playAlarmSong();
+			display.enableDisplay();
 			break;
 
 		case ERROR_MODE:
@@ -598,6 +562,62 @@ void loop()
 		default:
 			break;
 	}
+}
 
-	delay(10);
+// -------------------------------------- //
+//  Debug helper functions
+// -------------------------------------- //
+void printDigits(int digits, char separator)
+{
+  // Utility function for digital clock display: prints preceding 
+  // separator and leading 0
+  Serial.print(separator);
+  if(digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+void digitalClockDisplay()
+{
+	time_t t = now();
+	printDigits(hour(t)  ,' ');
+	printDigits(minute(t),':');
+	printDigits(second(t),':');
+	Serial.print(" ");
+	Serial.print(day(t));
+	Serial.print(" ");
+	Serial.print(month(t));
+	Serial.print(" ");
+	Serial.print(year(t)); 
+	Serial.println(); 
+}
+
+void rtcStatus()
+{
+  timeStatus_t rtcSta = timeStatus();
+  
+  if(rtcSta == timeSet)
+    Serial.println("Time's clock has been set.");
+  else if (rtcSta == timeNotSet)
+    Serial.println("Time's clock has not been set.");
+  else if (rtcSta == timeNeedsSync)
+    Serial.println("Time's clock is set, but the sync has failed.");
+  else
+    Serial.println("error");
+}
+
+// Debug statements, print new alarm / status to serial port.
+void printAlarmStatus()
+{
+	byte h, m, rtcOn;
+	Serial.print("New alarm time: ");
+	h = RTC.sramRead(ALARM_H_ADDR);
+	m = RTC.sramRead(ALARM_M_ADDR);
+	printDigits(h,' ');
+	printDigits(m,':');
+	rtcOn = isRtcAlarmOn();
+	if (rtcOn)
+		Serial.println(" -- ON");
+	else
+		Serial.println(" -- OFF");
 }
