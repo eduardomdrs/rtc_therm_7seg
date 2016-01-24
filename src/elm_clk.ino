@@ -1,3 +1,4 @@
+
 #include <DallasTemperature.h>
 #include <MCP79412RTC.h>
 #include <OneButton.h>
@@ -50,9 +51,9 @@
 #define SHOW_ALARM_MODE 4
 #define ERROR_MODE      5
 
-#define SHOW_TIME_DURATION    7000
-#define SHOW_TEMP_DURATION    3000
-#define ALARM_CLEAR_DURATION 60001
+#define SHOW_TIME_DURATION 7000
+#define SHOW_TEMP_DURATION 3000
+#define ONE_MINUTE         60000
 
 // ---------------------- //
 //  Alarm variables
@@ -88,6 +89,7 @@ int  tempInCelsius  = 0;
 unsigned long updateInterval    = 100;
 unsigned long lastTempRead      = 0;
 unsigned long lastClockRead     = 0;
+unsigned long lastAlarmTrigger  = 0;
 unsigned long lastShowTimeStart = 0;
 unsigned long lastShowTempStart = 0;
 
@@ -146,6 +148,7 @@ void stopAlarmCallback()
 	fsmState    = SHOW_TIME_MODE;
 	disableRtcAlarm();
 	notePosition = 0;
+	lastAlarmTrigger = millis();
 }
 
 byte isRtcAlarmOn()
@@ -322,6 +325,7 @@ void longPressA()
 			break;
 
 		case SHOW_TIME_MODE:
+		case SHOW_TEMP_MODE:
 			fsmState = EDIT_TIME_MODE;
 			break;
 
@@ -373,6 +377,7 @@ void longPressB()
   			break;
 
 		case SHOW_TIME_MODE:
+		case SHOW_TEMP_MODE:
 			fsmState = EDIT_ALARM_MODE;
 			break;
 
@@ -438,7 +443,7 @@ void loop()
 
 	// If alarm condition is detected, modify FSM state accordingly
 	// When an alarm is triggered, the alarm pin is pulled low.
-	//if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && !alarmTriggeredToday)
+	// if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && !alarmTriggeredToday)
 	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1))
 	{
 		oldFsmState = fsmState;
@@ -446,6 +451,15 @@ void loop()
 		updateTime();
 		display.enableClockDisplay();
 		fsmState    = SHOW_ALARM_MODE;
+	}
+
+	// After an alarm is cleared by the user, wait for a minute
+	// and re-enable the alarm to provide for repeatable alarms
+	// everyday without user intervention.
+	if ((millis() - lastAlarmTrigger) > ONE_MINUTE && lastAlarmTrigger)
+	{
+		enableRtcAlarm();
+		lastAlarmTrigger = 0;
 	}
 
 	switch (fsmState)
