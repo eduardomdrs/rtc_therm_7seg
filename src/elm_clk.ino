@@ -442,15 +442,15 @@ void loop()
 	}
 
 	// If alarm condition is detected, modify FSM state accordingly
-	// When an alarm is triggered, the alarm pin is pulled low.
-	// if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1) && !alarmTriggeredToday)
-	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1))
+	// Alarm is just triggered outside the edit modes.
+	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1)
+		&& fsmState != EDIT_ALARM_MODE && fsmState != EDIT_TIME_MODE)
 	{
 		oldFsmState = fsmState;
 		// update the time, so the display is not stuck in garbage.
 		updateTime();
 		display.enableClockDisplay();
-		fsmState    = SHOW_ALARM_MODE;
+		fsmState = SHOW_ALARM_MODE;
 	}
 
 	// After an alarm is cleared by the user, wait for a minute
@@ -583,12 +583,12 @@ void loop()
 // -------------------------------------- //
 void printDigits(int digits, char separator)
 {
-  // Utility function for digital clock display: prints preceding 
-  // separator and leading 0
-  Serial.print(separator);
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
+  	// Utility function for digital clock display: prints preceding 
+  	// separator and leading 0
+	Serial.print(separator);
+	if(digits < 10)
+		Serial.print('0');
+	Serial.print(digits);
 }
 
 void digitalClockDisplay()
@@ -608,16 +608,16 @@ void digitalClockDisplay()
 
 void rtcStatus()
 {
-  timeStatus_t rtcSta = timeStatus();
+	timeStatus_t rtcSta = timeStatus();
   
-  if(rtcSta == timeSet)
-    Serial.println("Time's clock has been set.");
-  else if (rtcSta == timeNotSet)
-    Serial.println("Time's clock has not been set.");
-  else if (rtcSta == timeNeedsSync)
-    Serial.println("Time's clock is set, but the sync has failed.");
-  else
-    Serial.println("error");
+	if(rtcSta == timeSet)
+		Serial.println("Time's clock has been set.");
+	else if (rtcSta == timeNotSet)
+		Serial.println("Time's clock has not been set.");
+	else if (rtcSta == timeNeedsSync)
+		Serial.println("Time's clock is set, but the sync has failed.");
+	else
+		Serial.println("error");
 }
 
 // Debug statements, print new alarm / status to serial port.
