@@ -1,5 +1,5 @@
-#ifndef ELM_CLK_H
-#define ELM_CLK_H
+#ifndef MEX_CLK_H
+#define MEX_CLK_H
 
 // Alarm functions
 void enableRtcAlarm();

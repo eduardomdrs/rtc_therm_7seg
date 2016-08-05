@@ -1,4 +1,3 @@
-
 #include <DallasTemperature.h>
 #include <MCP79412RTC.h>
 #include <OneButton.h>
@@ -7,7 +6,9 @@
 #include <TimerOne.h>
 #include <Wire.h>
 
+#include "MexClk.h"
 #include "SevenSegController.h"
+#include "Alarm.h"
 
 // ---------------------- //
 //  display control pins
@@ -21,6 +22,8 @@
 #define LATCH_PIN  8
 #define CLOCK_PIN  2
 #define DATA_PIN   7
+#define ALARM_PIN  A3
+
 
 // ---------------------- //
 //  Thermometer
@@ -32,14 +35,6 @@
 // ---------------------- //
 #define BUTTON_A_PIN A0
 #define BUTTON_B_PIN A1
-
-// ---------------------- //
-//  alarm pins / addr
-// ---------------------- //
-#define ALARM_PIN A3
-#define ALARM_H_ADDR  0x20
-#define ALARM_M_ADDR  0x21
-#define ALARM_ON_ADDR 0x22
 
 // ---------------------- //
 //  FSM definitions
@@ -54,9 +49,10 @@
 #define SHOW_TIME_DURATION 7000
 #define SHOW_TEMP_DURATION 3000
 #define ONE_MINUTE         60000
+#define ONE_SECOND		   1000
 
 // ---------------------- //
-//  Alarm variables
+//  Alarm song variables
 // ---------------------- //
 #define SONG_DURATION 64
 
@@ -100,27 +96,21 @@ OneButton buttonB(BUTTON_B_PIN, true);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress devAddr;
+Alarm wkAlarm;
 
 // ----------------------------- //
 //  RTC alarm functions
 // ----------------------------- //
 void enableRtcAlarm()
 {
-	RTC.enableAlarm(ALARM_0, ALM_MATCH_HOURS);
-	RTC.enableAlarm(ALARM_1, ALM_MATCH_MINUTES);
-	//RTC.alarmPolarity(LOW);
-
-	// save status to SRAM, easier retrieval
-	RTC.sramWrite(ALARM_ON_ADDR, 1);
+	wkAlarm.enableAlarm();
+	printAlarmStatus();
 }
 
 void disableRtcAlarm()
 {
-	RTC.enableAlarm(ALARM_0, ALM_DISABLE);
-	RTC.enableAlarm(ALARM_1, ALM_DISABLE);
-	
-	// save status to SRAM, easier retrieval
-	RTC.sramWrite(ALARM_ON_ADDR, 0);
+	wkAlarm.disableAlarm();
+	printAlarmStatus();
 }
 
 void setRtcAlarm(byte hour, byte minute)
@@ -134,12 +124,9 @@ void setRtcAlarm(byte hour, byte minute)
 	alarmSetting.Hour = hour;
 	alarmSetting.Minute = minute;
 	alarmSetting.Second = 0;
-	RTC.setAlarm(ALARM_0, makeTime(alarmSetting));
-	RTC.setAlarm(ALARM_1, makeTime(alarmSetting));
+	wkAlarm.setAlarmTime(makeTime(alarmSetting));
 
-	// save alarm setting to parts of SRAM, easier retrieval
-	RTC.sramWrite(ALARM_H_ADDR, hour);
-	RTC.sramWrite(ALARM_M_ADDR, minute);
+	printAlarmStatus();
 }
 
 void stopAlarmCallback()
@@ -153,8 +140,7 @@ void stopAlarmCallback()
 
 byte isRtcAlarmOn()
 {
-	byte alarmOn = RTC.sramRead(ALARM_ON_ADDR);
-	return alarmOn;
+	return (byte) wkAlarm.isEnabled();
 }
 
 void playAlarmSong()
@@ -189,26 +175,23 @@ void updateTime()
 	digitValues[2] = m / 10;
 	digitValues[3] = m % 10;
 
-	display.writeDigit(0, digitValues[0]);
-	display.writeDigit(1, digitValues[1]);
-	display.writeDigit(2, digitValues[2]);
-	display.writeDigit(3, digitValues[3]);
+	for (int i = 0; i < N; i++)
+		display.writeDigit(i, digitValues[i]);
 }
 
 void updateAlarm()
 {
-	int h = RTC.sramRead(ALARM_H_ADDR);
-	int m = RTC.sramRead(ALARM_M_ADDR);
+	time_t almTime = wkAlarm.getAlarmTime();
+	int h = hour(almTime);
+	int m = minute(almTime);
 
 	digitValues[0] = h / 10;
 	digitValues[1] = h % 10;
 	digitValues[2] = m / 10;
 	digitValues[3] = m % 10;
 
-	display.writeDigit(0, digitValues[0]);
-	display.writeDigit(1, digitValues[1]);
-	display.writeDigit(2, digitValues[2]);
-	display.writeDigit(3, digitValues[3]);
+	for (int i = 0; i < N; i++)
+		display.writeDigit(i, digitValues[i]);
 }
 
 void updateTemperature()
@@ -218,9 +201,9 @@ void updateTemperature()
 	digitValues[0] = tempInCelsius / 100;
 	digitValues[1] = (tempInCelsius % 100) / 10;
 	digitValues[2] = tempInCelsius % 10;
-	display.writeDigit(0,digitValues[0]);
-	display.writeDigit(1,digitValues[1]);
-	display.writeDigit(2,digitValues[2]);
+
+	for (int i = 0; i < N-1; i++)
+		display.writeDigit(i, digitValues[i]);
 }
 
 int maxValueForDigit(int digit)
@@ -301,10 +284,10 @@ void longPressA()
 			int m;
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
-			setTime(h, m, 0, 1, 1, 2015);
+			setTime(h, m, 0, 1, 1, 2016);
   			RTC.set(now());
   			fsmState = SHOW_TIME_MODE;
-  			break;
+			break;
 
 		case EDIT_ALARM_MODE:
 			if (isRtcAlarmOn())
@@ -312,15 +295,11 @@ void longPressA()
 				disableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.disableDecimalPoint(i);
-
-				// printAlarmStatus();
 			} else 
 			{
 				enableRtcAlarm();
 				for (int i = 0; i < N; i++)
 					display.enableDecimalPoint(i);
-
-				// printAlarmStatus();
 			}
 			break;
 
@@ -372,7 +351,6 @@ void longPressB()
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
 			setRtcAlarm(h,m);
-			// printAlarmStatus();
   			fsmState = SHOW_TIME_MODE;
   			break;
 
@@ -412,11 +390,12 @@ void setup()
 	buttonB.attachLongPressStart(longPressB);
 
 	// initialize serial
-	Serial.begin(9600);
+	Serial.begin(115200);
 
 	// initialize rtc
+	
 	setSyncProvider(RTC.get);
-	setSyncInterval(2);
+	setSyncInterval(1);
 	if(timeStatus()!= timeSet) 
 	{
 		Serial.println("Unable to sync with the RTC");
@@ -428,8 +407,6 @@ void setup()
 	
 	// default alarm settings, 08:30, disabled
 	pinMode(ALARM_PIN, INPUT_PULLUP);
-	setRtcAlarm(0,0);
-	disableRtcAlarm();
 }
 
 void loop()
@@ -443,14 +420,17 @@ void loop()
 
 	// If alarm condition is detected, modify FSM state accordingly
 	// Alarm is just triggered outside the edit modes.
-	if (RTC.alarm(ALARM_0) && RTC.alarm(ALARM_1)
-		&& fsmState != EDIT_ALARM_MODE && fsmState != EDIT_TIME_MODE)
+	if (wkAlarm.isTriggered(now()) && fsmState != EDIT_ALARM_MODE 
+		&& fsmState != EDIT_TIME_MODE && fsmState != SHOW_ALARM_MODE)
 	{
 		oldFsmState = fsmState;
 		// update the time, so the display is not stuck in garbage.
 		updateTime();
 		display.enableClockDisplay();
 		fsmState = SHOW_ALARM_MODE;
+
+		digitalClockDisplay();
+		printAlarmStatus();
 	}
 
 	// After an alarm is cleared by the user, wait for a minute
@@ -461,6 +441,7 @@ void loop()
 		enableRtcAlarm();
 		lastAlarmTrigger = 0;
 	}
+
 
 	switch (fsmState)
 	{
@@ -558,7 +539,8 @@ void loop()
 
 		case SHOW_ALARM_MODE:
 			display.disableDisplay();
-			playAlarmSong();
+			//playAlarmSong();
+			display.writeMessage("ALAR");
 			display.enableDisplay();
 			break;
 
@@ -571,9 +553,6 @@ void loop()
 				Serial.println("Error detected, disabling RTC alarm.");
 				disableRtcAlarm();
 			}
-			break;
-
-		default:
 			break;
 	}
 }
@@ -620,13 +599,12 @@ void rtcStatus()
 		Serial.println("error");
 }
 
-// Debug statements, print new alarm / status to serial port.
 void printAlarmStatus()
 {
+	time_t almSet = wkAlarm.getAlarmTime();
 	byte h, m, rtcOn;
-	Serial.print("New alarm time: ");
-	h = RTC.sramRead(ALARM_H_ADDR);
-	m = RTC.sramRead(ALARM_M_ADDR);
+	h = hour(almSet);
+	m = minute(almSet);
 	printDigits(h,' ');
 	printDigits(m,':');
 	rtcOn = isRtcAlarmOn();
@@ -634,4 +612,5 @@ void printAlarmStatus()
 		Serial.println(" -- ON");
 	else
 		Serial.println(" -- OFF");
+
 }
