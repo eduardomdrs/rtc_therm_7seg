@@ -49,7 +49,7 @@
 #define SHOW_TIME_DURATION 7000
 #define SHOW_TEMP_DURATION 3000
 #define ONE_MINUTE         60000
-#define ONE_SECOND		   1000
+#define ONE_SECOND         1000
 
 // ---------------------- //
 //  Alarm song variables
