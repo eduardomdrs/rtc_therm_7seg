@@ -285,8 +285,8 @@ void longPressA()
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
 			setTime(h, m, 0, 1, 1, 2016);
-  			RTC.set(now());
-  			fsmState = SHOW_TIME_MODE;
+			RTC.set(now());
+			fsmState = SHOW_TIME_MODE;
 			break;
 
 		case EDIT_ALARM_MODE:
@@ -351,8 +351,8 @@ void longPressB()
 			h = digitValues[0]*10 + digitValues[1];
 			m = digitValues[2]*10 + digitValues[3];
 			setRtcAlarm(h,m);
-  			fsmState = SHOW_TIME_MODE;
-  			break;
+			fsmState = SHOW_TIME_MODE;
+			break;
 
 		case SHOW_TIME_MODE:
 		case SHOW_TEMP_MODE:
@@ -562,8 +562,8 @@ void loop()
 // -------------------------------------- //
 void printDigits(int digits, char separator)
 {
-  	// Utility function for digital clock display: prints preceding 
-  	// separator and leading 0
+	// Utility function for digital clock display: prints preceding 
+	// separator and leading 0
 	Serial.print(separator);
 	if(digits < 10)
 		Serial.print('0');
