@@ -539,8 +539,9 @@ void loop()
 
 		case SHOW_ALARM_MODE:
 			display.disableDisplay();
-			//playAlarmSong();
-			display.writeMessage("ALAR");
+			display.disableColon();
+			playAlarmSong();
+			display.enableColon();
 			display.enableDisplay();
 			break;
 
